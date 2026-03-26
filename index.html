@@ -611,12 +611,8 @@
         <div id="profile-display"></div>
         <div class="divider"></div>
         <div class="card">
-          <div class="card-title" style="margin-bottom:12px">🤖 AI Settings</div>
-          <div class="field">
-            <label>OpenAI API Key</label>
-            <input type="password" id="api-key-input" placeholder="sk-..." oninput="saveApiKey(this.value)">
-            <div class="api-key-note">🔒 Your API key is stored only on this device in localStorage and sent directly to OpenAI. It is never stored or transmitted anywhere else. Find it at <strong>platform.openai.com/api-keys</strong>.</div>
-          </div>
+          <div class="card-title" style="margin-bottom:8px">✅ Fully Offline & Free</div>
+          <div style="font-size:14px;color:var(--ink-mid);line-height:1.6">PackReady generates all trip guides, packing lists, and advice locally on your device — no API key, no subscription, no internet connection required.</div>
         </div>
         <div style="margin-top:12px">
           <button class="btn btn-secondary" onclick="showEditProfile()">Edit Profile</button>
@@ -758,7 +754,7 @@ const OB_STEPS = [
     `,
   },
   {
-    title:'📐 Your measurements',
+    title:'🗺 Your Experience Level',
     fields:`
       <div class="field-row">
         <div class="field"><label>Height (cm)</label><input type="number" id="ob-height" placeholder="175" min="100" max="250"></div>
@@ -771,14 +767,7 @@ const OB_STEPS = [
           <option value="Experienced">🗺 Experienced — seasoned explorer</option>
         </select>
       </div>
-    `,
-  },
-  {
-    title:'🤖 AI API Key',
-    fields:`
-      <div class="field"><label>OpenAI API Key</label><input type="password" id="ob-apikey" placeholder="sk-..."></div>
-      <div class="api-key-note">🔒 Your key is stored only on this device in localStorage and sent directly to OpenAI. PackReady never sees it.</div>
-      <p style="font-size:13px;color:var(--ink-soft);margin-top:14px;line-height:1.6">You can skip this and add it later in Profile. Find your key at <strong>platform.openai.com/api-keys</strong>.</p>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:14px;line-height:1.6">✅ No API key needed — PackReady generates all guides offline, completely free!</p>
     `,
   },
 ];
@@ -824,9 +813,6 @@ function obNext() {
     profile.height = document.getElementById('ob-height')?.value || '';
     profile.weight = document.getElementById('ob-weight')?.value || '';
     profile.experience = document.getElementById('ob-exp')?.value || 'Intermediate';
-  } else if (obStep === 3) {
-    const key = document.getElementById('ob-apikey')?.value.trim();
-    if (key) { apiKey = key; localStorage.setItem('pr_apikey', key); }
   }
   save();
   if (obStep < OB_STEPS.length - 1) {
@@ -845,7 +831,6 @@ function obBack() {
 
 // ── INIT ─────────────────────────────────────────────────────────
 function initApp() {
-  if (apiKey) document.getElementById('api-key-input').value = apiKey;
   showTab('home');
 }
 
@@ -1065,206 +1050,489 @@ function toggleSection(card) {
   card.classList.toggle('open');
 }
 
-// ── AI GENERATION ─────────────────────────────────────────────────
-function buildProfile() {
-  if (!profile) return 'Traveller profile not set.';
-  return `Traveller profile: ${profile.name}, ${profile.age || 'age unknown'}, ${profile.gender || ''}, from ${profile.city || ''} ${profile.country || ''}, passport: ${profile.passport}, experience level: ${profile.experience || 'Intermediate'}, height: ${profile.height || 'unknown'}cm, weight: ${profile.weight || 'unknown'}kg.`;
-}
+// ── OFFLINE RULE-BASED GUIDE GENERATOR ───────────────────────────
+// No API needed — generates rich, personalised content from trip inputs
 
-function buildTripContext(trip) {
-  const nights = daysBetween(trip.depart, trip.returnDate);
-  return `Trip details: Destination: ${trip.destination}. Dates: ${trip.depart} to ${trip.returnDate} (${nights} nights). Trip types: ${(trip.tripTypes||[]).join(', ')||'general'}. Climate: ${trip.climate||'unknown'}. Accommodation: ${trip.accom||'unknown'}. Companions: ${trip.companions||'solo'}. Activities: ${trip.activities||'general tourism'}. Special notes: ${trip.notes||'none'}.`;
-}
-
-function sectionPrompt(trip, sectionKey) {
-  const prof = buildProfile();
-  const ctx  = buildTripContext(trip);
-  const nights = daysBetween(trip.depart, trip.returnDate);
-
-  const prompts = {
-    packing: `You are a world-class packing expert who draws from ultralight packing communities, Reddit's r/onebag, r/travel, r/ultralight, destination-specific expat forums, and mainstream travel resources.
-${prof}
-${ctx}
-
-Generate a comprehensive, highly personalized packing list for this exact trip. Use the traveller's height/weight for clothing size context and bag fit. Consider the duration (${nights} nights), climate, activities, and accommodation type.
-
-Return ONLY a JSON object with this structure (no markdown, no preamble):
-{
-  "categories": [
-    {
-      "name": "Clothing",
-      "emoji": "👔",
-      "items": [
-        {"name": "Moisture-wicking T-shirts × 3", "qty": "3"},
-        ...
-      ]
-    },
-    {
-      "name": "Gear",
-      "emoji": "🎒",
-      "items": [...]
-    },
-    {
-      "name": "Accessories",
-      "emoji": "🕶",
-      "items": [...]
-    },
-    {
-      "name": "Toiletries & Health",
-      "emoji": "🧴",
-      "items": [...]
-    },
-    {
-      "name": "Documents & Money",
-      "emoji": "📄",
-      "items": [...]
-    },
-    {
-      "name": "Electronics",
-      "emoji": "📱",
-      "items": [...]
-    },
-    {
-      "name": "Trip Essentials",
-      "emoji": "⭐",
-      "items": [...]
-    }
-  ]
-}
-
-Include specific quantities (e.g. "3× T-shirts", "1× Rain jacket") for all clothing. Be specific to ${trip.destination}, the climate (${trip.climate}), and activities planned. Add non-obvious items from experienced travellers and packing communities. Total items: aim for 50-80 highly relevant items.`,
-
-    bag: `You are a gear expert who advises travellers on optimal bag configurations. Draw from r/onebag, r/ultralight, r/travel, gear review sites, and experienced traveller forums.
-${prof}
-${ctx}
-
-Provide a detailed bag size recommendation for this traveller and trip. Consider their height/weight for fit, trip duration (${nights} nights), activities, and accommodation type.
-
-Return your response as plain text with markdown-style formatting (use **bold** for headings, - for bullets). Include:
-1. Recommended bag configuration (e.g. "40L carry-on + small daypack")
-2. Why this size is optimal for this trip
-3. Specific bag recommendations by category (brand suggestions welcome)
-4. Tips for packing efficiently for this trip type
-5. What to leave at home
-Be specific, practical, and opinionated. Draw from community wisdom.`,
-
-    visa: `You are a visa and immigration expert. Draw from official government sources, Timatic, IATA, r/travel visa megathreads, and expat communities.
-${prof}
-${ctx}
-
-Provide visa and entry requirement information for a ${profile ? profile.passport : 'Australian'} passport holder entering ${trip.destination}.
-
-Return plain text with markdown-style formatting. Include:
-1. Visa requirement status (visa-free / visa on arrival / e-visa / full visa required)
-2. Maximum stay allowed
-3. Application process and links if needed
-4. Passport validity requirements
-5. Any entry requirements (proof of onward travel, hotel bookings, funds)
-6. COVID/health entry requirements if any current
-7. Important note to always verify with official embassy/consulate
-
-⚠️ Always remind the traveller to verify with official sources as requirements change frequently.`,
-
-    advice: `You are a seasoned traveller and destination expert who curates advice from locals, expats, r/travel, destination-specific subreddits, Lonely Planet forums, and niche travel communities.
-${prof}
-${ctx}
-
-Provide rich, specific travel advice for ${trip.destination} tailored to this exact trip.
-
-Return plain text with markdown-style formatting. Include:
-1. **Safety** — neighbourhood safety, common scams targeting tourists, what to avoid
-2. **Getting Around** — best local transport options, apps to download, taxi vs rideshare
-3. **SIM Card & Connectivity** — best local SIM options, coverage, data costs
-4. **Money & Tipping** — cash vs card, ATM tips, tipping culture expectations
-5. **Cultural Customs** — dress codes, etiquette, things that might surprise a ${profile ? profile.country : 'Western'} traveller
-6. **Hidden Gems** — non-obvious tips from locals and long-term travellers
-7. **Apps to Download** — essential apps for this destination
-
-Be specific to ${trip.destination}, not generic. Draw from community knowledge.`,
-
-    health: `You are a travel medicine expert who draws from WHO guidelines, CDC Travel Health, travel medicine clinics, and r/travel health discussions.
-${prof}
-${ctx}
-
-Provide health and vaccination advice for travel to ${trip.destination}.
-
-Return plain text with markdown-style formatting. Include:
-1. **Recommended Vaccinations** — list each with urgency level
-2. **Required Vaccinations** — any mandatory jabs for entry
-3. **Malaria Risk** — prophylactic recommendations if applicable
-4. **Food & Water Safety** — tap water, street food guidance
-5. **Health Insurance** — what to look for in travel insurance for this destination
-6. **Medications to Pack** — specific recommendations for this climate/region
-7. **Medical Facilities** — hospital quality, payment expectations
-8. **Emergency Numbers** — local emergency contacts
-
-⚠️ Remind the traveller to consult a travel medicine clinic or GP before departure.`,
-  };
-
-  return prompts[sectionKey];
-}
-
-async function generateSection(trip, sectionKey) {
+function generateSection(trip, sectionKey) {
   const bodyEl = document.getElementById(`secbody-${trip.id}-${sectionKey}`);
   if (!bodyEl) return;
 
-  if (!apiKey) {
-    renderSectionFallback(trip, sectionKey, 'No API key set — please add your OpenAI API key in the Profile tab.');
-    return;
-  }
+  bodyEl.innerHTML = `<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-text">Building your guide…</div></div>`;
 
-  bodyEl.innerHTML = `<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-text">Generating with AI…</div></div>`;
-
-  try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: sectionKey === 'packing' ? 3000 : 1200,
-        temperature: 0.7,
-        messages: [
-          { role: 'user', content: sectionPrompt(trip, sectionKey) }
-        ],
-      }),
-    });
-
-    if (!resp.ok) {
-      const err = await resp.json();
-      throw new Error(err.error?.message || `HTTP ${resp.status}`);
-    }
-
-    const data = await resp.json();
-    const content = data.choices?.[0]?.message?.content || '';
-
-    // Save to trip
+  // Small timeout so spinner actually renders before sync work
+  setTimeout(() => {
     const idx = trips.findIndex(t => t.id === trip.id);
-    if (idx !== -1) {
-      trips[idx].sections[sectionKey] = content;
-      if (sectionKey === 'packing') {
-        // Parse and store structured packing list
-        try {
-          const clean = content.replace(/```json[\s\S]*?```/g, m => m.slice(7,-3)).replace(/```/g,'').trim();
-          const parsed = JSON.parse(clean);
-          trips[idx].packItems = buildPackItems(parsed);
-        } catch(e) {
-          trips[idx].packItems = buildFallbackPackItems(trip);
-        }
-      }
-      save();
-      renderSectionContent(trips[idx], sectionKey);
+    if (idx === -1) return;
+
+    if (sectionKey === 'packing') {
+      trips[idx].packItems = generatePackItems(trip);
+      trips[idx].sections.packing = 'generated';
+    } else {
+      trips[idx].sections[sectionKey] = generateSectionText(trip, sectionKey);
     }
-  } catch(err) {
-    console.error('AI error:', err);
-    renderSectionFallback(trip, sectionKey, err.message);
+    save();
+    renderSectionContent(trips[idx], sectionKey);
+  }, 300);
+}
+
+// ── PACKING LIST GENERATOR ────────────────────────────────────────
+function generatePackItems(trip) {
+  const nights  = daysBetween(trip.depart, trip.returnDate);
+  const types   = (trip.tripTypes || []).map(t => t.toLowerCase());
+  const climate = (trip.climate || '').toLowerCase();
+  const accom   = (trip.accom   || '').toLowerCase();
+  const comp    = (trip.companions || '').toLowerCase();
+
+  const is = (...keys) => keys.some(k => types.some(t => t.includes(k)) || climate.includes(k) || accom.includes(k));
+  const isType = (...keys) => keys.some(k => types.some(t => t.includes(k)));
+
+  // Smart clothing quantities
+  const shirtDays  = Math.min(Math.ceil(nights * 0.6) + 1, 7);
+  const bottomDays = Math.min(Math.ceil(nights * 0.4) + 1, 5);
+  const sockDays   = Math.min(nights + 1, 7);
+  const underDays  = Math.min(nights + 1, 8);
+
+  const items = { Clothing: [], Gear: [], Accessories: [], 'Toiletries & Health': [], 'Documents & Money': [], Electronics: [], 'Trip Extras': [] };
+  const add = (cat, name) => items[cat].push(name);
+
+  // ── CLOTHING ──────────────────────────────────────────────────
+  if (is('hot','tropical','beach','desert')) {
+    add('Clothing', `Lightweight t-shirts × ${shirtDays}`);
+    add('Clothing', `Breathable shorts × ${bottomDays}`);
+    add('Clothing', 'One smart shirt / blouse (evenings)');
+    add('Clothing', 'Lightweight linen trousers or dress');
+    add('Clothing', 'Swimsuit / boardshorts');
+    add('Clothing', 'Flip flops / sandals');
+    add('Clothing', 'Comfortable walking shoes');
+  } else if (is('cold','arctic','winter','ski')) {
+    add('Clothing', `Thermal base layer tops × ${Math.min(shirtDays,3)}`);
+    add('Clothing', `Thermal base layer bottoms × 2`);
+    add('Clothing', `Mid-layer fleece or wool jumper × 2`);
+    add('Clothing', 'Insulated waterproof jacket');
+    add('Clothing', `Warm trousers / jeans × ${bottomDays}`);
+    add('Clothing', 'Waterproof over-trousers');
+    add('Clothing', 'Insulated waterproof boots');
+    add('Clothing', 'Warm hat & gloves');
+    add('Clothing', 'Scarf / neck gaiter');
+    add('Clothing', 'Thermal socks × 4');
+  } else {
+    add('Clothing', `T-shirts / casual tops × ${shirtDays}`);
+    add('Clothing', `Trousers / jeans × ${bottomDays}`);
+    add('Clothing', 'Smart casual outfit (one dinner / event)');
+    add('Clothing', 'Light jacket or cardigan');
+    add('Clothing', 'Comfortable walking shoes / sneakers');
   }
+
+  add('Clothing', `Underwear × ${underDays}`);
+  add('Clothing', `Socks × ${sockDays}`);
+  if (is('hiking','camping','backpacking')) add('Clothing', 'Moisture-wicking hiking socks × 3');
+  if (isType('hiking','camping','backpacking')) {
+    add('Clothing', 'Sturdy hiking boots or trail runners');
+    add('Clothing', 'Quick-dry hiking pants × 2');
+    add('Clothing', 'Moisture-wicking base layer tops × 2');
+    add('Clothing', 'Waterproof rain jacket');
+    add('Clothing', 'Sun hat / wide-brim hat');
+  }
+  if (isType('business')) {
+    add('Clothing', 'Business shirts × 3');
+    add('Clothing', 'Smart trousers or skirt × 2');
+    add('Clothing', 'Blazer / suit jacket');
+    add('Clothing', 'Dress shoes');
+    add('Clothing', 'Ties / accessories if needed');
+  }
+  if (isType('beach')) {
+    add('Clothing', 'Beach cover-up / sarong');
+    add('Clothing', 'UV-protective rash guard');
+  }
+  if (isType('festival')) {
+    add('Clothing', 'Festival outfits × 3 (comfortable & fun)');
+    add('Clothing', 'Wellies / waterproof boots');
+    add('Clothing', 'Warm layers for night');
+  }
+
+  // ── GEAR ──────────────────────────────────────────────────────
+  if (nights <= 3) {
+    add('Gear', '20–35L carry-on backpack or cabin bag');
+  } else if (nights <= 7) {
+    add('Gear', '40–50L travel backpack or medium suitcase');
+  } else {
+    add('Gear', '60–70L travel backpack or large suitcase');
+  }
+  add('Gear', 'Packing cubes (set of 3–4)');
+  add('Gear', 'Day pack / small backpack');
+  add('Gear', 'Reusable water bottle');
+  add('Gear', 'Padlock for bags / lockers');
+  if (isType('hiking','camping','backpacking')) {
+    add('Gear', 'Hiking daypack (20–25L)');
+    add('Gear', 'Trekking poles');
+    add('Gear', 'Headlamp + spare batteries');
+    add('Gear', 'Dry bags / waterproof stuff sacks');
+  }
+  if (isType('camping')) {
+    add('Gear', 'Tent (or confirm campsite provides one)');
+    add('Gear', 'Sleeping bag (appropriate temp rating)');
+    add('Gear', 'Sleeping mat / inflatable pad');
+    add('Gear', 'Camping stove + fuel canister');
+    add('Gear', 'Mess kit (plate, mug, cutlery)');
+    add('Gear', 'Lighter / firestarter');
+    add('Gear', 'Compact camp towel');
+  }
+  if (isType('beach')) {
+    add('Gear', 'Dry bag for beach essentials');
+    add('Gear', 'Snorkelling mask & fins (or rent locally)');
+    add('Gear', 'Underwater camera / GoPro');
+  }
+  if (is('cold','winter','ski','arctic')) {
+    add('Gear', 'Hand warmers × 6');
+    add('Gear', 'Ski / snowboard equipment (or hire locally)');
+  }
+  if (comp.includes('family')) {
+    add('Gear', 'Kids\' day packs');
+    add('Gear', 'Portable entertainment for children');
+    add('Gear', 'Baby carrier / lightweight stroller if applicable');
+  }
+
+  // ── ACCESSORIES ───────────────────────────────────────────────
+  add('Accessories', 'Sunglasses (UV400)');
+  add('Accessories', 'Travel umbrella / packable rain poncho');
+  add('Accessories', 'Money belt or hidden travel wallet');
+  add('Accessories', 'Luggage tags');
+  add('Accessories', 'Reusable shopping bag');
+  if (is('hot','tropical','beach','desert')) add('Accessories', 'Sun hat / cap');
+  if (isType('hiking','camping')) add('Accessories', 'Compass or GPS watch');
+  if (nights > 7) add('Accessories', 'Travel pillow & eye mask');
+  add('Accessories', 'Earplugs');
+  if (accom.includes('hostel') || accom.includes('camping')) add('Accessories', 'Padlock for hostel locker');
+  add('Accessories', 'Cable ties × 4 (bag security)');
+
+  // ── TOILETRIES & HEALTH ───────────────────────────────────────
+  add('Toiletries & Health', 'Toothbrush & toothpaste');
+  add('Toiletries & Health', 'Shampoo & conditioner (travel size)');
+  add('Toiletries & Health', 'Body wash / soap');
+  add('Toiletries & Health', 'Deodorant');
+  add('Toiletries & Health', 'Razor & shaving cream');
+  add('Toiletries & Health', 'Moisturiser / face cream');
+  add('Toiletries & Health', `Sunscreen SPF 50+`);
+  if (is('hot','tropical','beach','desert')) add('Toiletries & Health', 'After-sun lotion / aloe vera gel');
+  add('Toiletries & Health', 'Lip balm with SPF');
+  add('Toiletries & Health', 'Nail clippers & tweezers');
+  add('Toiletries & Health', 'Personal prescription medications (full supply + extra)');
+  add('Toiletries & Health', 'Paracetamol / ibuprofen');
+  add('Toiletries & Health', 'Antihistamines');
+  add('Toiletries & Health', 'Imodium / electrolyte sachets');
+  add('Toiletries & Health', 'Antiseptic wipes & plasters');
+  add('Toiletries & Health', 'Hand sanitiser');
+  add('Toiletries & Health', 'Insect repellent (DEET 30%+)');
+  if (is('tropical','hot','beach','desert','safari')) add('Toiletries & Health', 'Malaria prophylactics (consult GP)');
+  if (is('cold','arctic','winter')) add('Toiletries & Health', 'Lip balm & heavy-duty hand cream');
+  if (nights > 7) add('Toiletries & Health', 'Laundry powder / sink wash sachets');
+
+  // ── DOCUMENTS & MONEY ─────────────────────────────────────────
+  add('Documents & Money', 'Passport (valid 6+ months beyond return)');
+  add('Documents & Money', 'Visa (if required — check requirements)');
+  add('Documents & Money', 'Flight tickets / e-tickets printed or saved offline');
+  add('Documents & Money', 'Accommodation booking confirmations');
+  add('Documents & Money', 'Travel insurance policy & emergency number');
+  add('Documents & Money', 'Credit card (notify bank before travel)');
+  add('Documents & Money', 'Debit card (for ATM withdrawals)');
+  add('Documents & Money', `Local currency cash (${trip.destination} — arrive with some)`);
+  add('Documents & Money', 'Emergency contact list (written down)');
+  add('Documents & Money', 'Passport-size photos × 4 (for visas / emergencies)');
+  if (profile?.passportExp) add('Documents & Money', `Passport expiry: ${formatDate(profile.passportExp)} — double-check validity`);
+  if (isType('business')) add('Documents & Money', 'Business cards');
+  if (isType('business')) add('Documents & Money', 'Work documents / presentations');
+
+  // ── ELECTRONICS ───────────────────────────────────────────────
+  add('Electronics', 'Smartphone + charging cable');
+  add('Electronics', 'Power bank (10,000mAh+)');
+  add('Electronics', 'Universal travel adapter');
+  add('Electronics', 'Earbuds / headphones');
+  add('Electronics', 'Plug-in charger / USB multi-port');
+  if (nights > 4) add('Electronics', 'Laptop or tablet + charger');
+  if (isType('hiking','camping','safari')) add('Electronics', 'Action camera / GoPro + mounts');
+  if (isType('photography') || (trip.activities||'').toLowerCase().includes('photo')) add('Electronics', 'Camera + extra memory cards & batteries');
+  add('Electronics', 'E-reader / downloaded books & podcasts');
+  add('Electronics', 'Sim card or eSIM for destination (research before travel)');
+
+  // ── TRIP EXTRAS (type-specific) ───────────────────────────────
+  if (isType('beach')) {
+    add('Trip Extras', 'Beach towel');
+    add('Trip Extras', 'Waterproof phone case');
+    add('Trip Extras', 'Beach mat');
+    add('Trip Extras', 'Reef-safe sunscreen');
+  }
+  if (isType('hiking','camping','backpacking')) {
+    add('Trip Extras', 'Trail map / downloaded offline maps');
+    add('Trip Extras', 'Emergency whistle');
+    add('Trip Extras', 'Water purification tablets or filter');
+    add('Trip Extras', 'Energy bars / trail snacks');
+    add('Trip Extras', 'Blister prevention tape (Body Glide / Compeed)');
+  }
+  if (isType('winter sports','ski')) {
+    add('Trip Extras', 'Ski pass (book online in advance)');
+    add('Trip Extras', 'Goggles');
+    add('Trip Extras', 'Helmet (hire or bring)');
+    add('Trip Extras', 'Snow gloves / mittens × 2 pairs');
+    add('Trip Extras', 'Thermal ski socks × 4');
+  }
+  if (isType('safari')) {
+    add('Trip Extras', 'Neutral/khaki clothing (no bright colours)');
+    add('Trip Extras', 'Binoculars');
+    add('Trip Extras', 'Long-lens camera');
+    add('Trip Extras', 'Head torch');
+  }
+  if (isType('festival')) {
+    add('Trip Extras', 'Portable phone charger (high capacity)');
+    add('Trip Extras', 'Cashless wristband / festival card');
+    add('Trip Extras', 'Waterproof poncho');
+    add('Trip Extras', 'Small backpack for festival days');
+  }
+  if (isType('business')) {
+    add('Trip Extras', 'Portable laptop stand');
+    add('Trip Extras', 'Noise-cancelling headphones');
+    add('Trip Extras', 'Presentation clicker');
+  }
+  if (comp.includes('family')) {
+    add('Trip Extras', 'Travel games / activity books for kids');
+    add('Trip Extras', 'Snacks for children');
+    add('Trip Extras', 'Baby wipes (multipurpose)');
+    add('Trip Extras', 'Childrens\' medications & plasters');
+  }
+
+  // Serialise into the packItems format
+  const catEmojis = {
+    'Clothing':'👔','Gear':'🎒','Accessories':'🕶','Toiletries & Health':'🧴',
+    'Documents & Money':'📄','Electronics':'📱','Trip Extras':'⭐'
+  };
+  const result = {};
+  Object.entries(items).forEach(([cat, list]) => {
+    list.forEach(name => {
+      const id = uid();
+      result[id] = { id, name, category: cat, catEmoji: catEmojis[cat] || '📦', checked: false };
+    });
+  });
+  return result;
+}
+
+// ── TEXT SECTION GENERATORS ───────────────────────────────────────
+function generateSectionText(trip, sectionKey) {
+  const fns = { bag: genBag, visa: genVisa, advice: genAdvice, health: genHealth };
+  return fns[sectionKey] ? fns[sectionKey](trip) : '';
+}
+
+function genBag(trip) {
+  const nights = daysBetween(trip.depart, trip.returnDate);
+  const types  = (trip.tripTypes||[]).map(t=>t.toLowerCase());
+  const isType = (...k) => k.some(k => types.some(t=>t.includes(k)));
+
+  let main, day, reason, tips;
+
+  if (nights <= 3 && !isType('camping','hiking','ski')) {
+    main = '20–35L carry-on backpack or small cabin suitcase';
+    reason = `${nights} nights is perfect for carry-on only — you'll save time at the airport and never worry about lost luggage.`;
+    tips = ['Roll clothes instead of folding to save space', 'Use a toiletry bag with TSA-friendly liquids (under 100ml each)', 'Wear your bulkiest shoes and jacket on the plane'];
+  } else if (nights <= 7 && !isType('camping','ski')) {
+    main = '40–50L travel backpack or medium checked suitcase (55cm)';
+    reason = `${nights} nights works well with a 40–50L bag if you pack smart. Many travellers do a week in carry-on only.`;
+    tips = ['Packing cubes are essential at this size', 'Plan 1–2 laundry days to halve your clothing load', 'A packable day bag saves bringing a second full bag'];
+  } else if (isType('camping','hiking','backpacking')) {
+    main = '50–70L hiking/travel backpack (with internal frame)';
+    day  = '+ 20–25L hiking daypack';
+    reason = 'Outdoor adventures need gear space, but keep weight under 15kg total. Your back will thank you.';
+    tips = ['Compression sacks shrink sleeping bags & down jackets dramatically', 'Hang wet gear outside your pack with carabiners', 'Heaviest items go closest to your back and high up'];
+  } else if (isType('ski','winter sports')) {
+    main = 'Large checked suitcase (75cm / 90L+) for ski gear';
+    day  = '+ 30L carry-on for daily essentials';
+    reason = 'Ski boots and helmets are bulky. Consider hiring boots at resort to save a bag.';
+    tips = ['Hire skis/snowboard at the resort — cheaper than airline fees', 'Pack thermals and base layers in carry-on in case luggage is delayed', 'Use ski boot bags that also fit your helmet'];
+  } else {
+    main = '60–70L travel backpack or large suitcase';
+    reason = `For ${nights} nights you'll need the space, especially for laundry. Build in a wash day every 5–6 days.`;
+    tips = ['Compression packing cubes cut volume by 30%', 'Decant toiletries into small containers — no need to bring full sizes', 'Leave 20% of bag empty for shopping / souvenirs'];
+  }
+
+  let out = `**🧳 Recommended Bag Setup**\n\n**Main bag:** ${main}\n`;
+  if (day) out += `**Day bag:** ${day}\n`;
+  out += `\n${reason}\n\n`;
+  out += `**💡 Packing Tips for This Trip**\n\n`;
+  tips.forEach(t => out += `- ${t}\n`);
+  out += `\n**📦 Bag Brands Worth Considering**\n\n`;
+  if (isType('backpacking','hiking','camping')) {
+    out += `- **Osprey Farpoint 40 / 55** — travel-friendly, airline-compatible\n- **Deuter Aircontact** — great back ventilation for hot hikes\n- **Gregory Baltoro** — premium for longer expeditions\n`;
+  } else {
+    out += `- **Osprey Farpoint 40** — the carry-on go-to for backpackers\n- **Peak Design Travel Bag 45L** — premium, very organised\n- **Away The Carry-On** — hard shell, great for city trips\n- **Samsonite Lite-Box** — lightweight checked option\n`;
+  }
+  out += `\n**🚫 Leave These at Home**\n\n- Full-size shampoo/conditioner bottles (buy or use hotel's)\n- Excessive "just in case" outfits\n- Your laptop if you won't work (use phone)\n- Jewellery you'd be devastated to lose`;
+  return out;
+}
+
+function genVisa(trip) {
+  const dest      = trip.destination;
+  const passport  = profile?.passport || 'your nationality';
+  const passportExp = profile?.passportExp;
+
+  let expiryWarning = '';
+  if (passportExp) {
+    const monthsLeft = (new Date(passportExp) - new Date()) / (1000*60*60*24*30);
+    if (monthsLeft < 9) expiryWarning = `\n⚠️ **Passport Expiry Alert:** Your passport expires ${formatDate(passportExp)} — that's only ${Math.round(monthsLeft)} months away. Many countries require 6 months validity beyond your return date. Renew if in doubt.\n`;
+  }
+
+  return `**📋 Visa & Entry Requirements**
+
+${expiryWarning}
+**Important:** Visa rules change frequently. Always verify requirements with the official embassy website or your government's travel advice page before booking.
+
+**Checking Your Requirements**
+
+For a **${passport}** passport holder travelling to **${dest}**, use these authoritative sources:
+
+- 🌐 **Passport Index** — passportindex.org (visa-free score by nationality)
+- 🌐 **IATA Travel Centre** — iatatravelcentre.com (most accurate, used by airlines)
+- 🌐 **VisaHQ** — visahq.com (application service + requirements)
+- 🌐 **${dest.split(',')[0]} Embassy** — search "[${dest.split(',')[0]}] embassy in [your country]"
+
+**General Entry Checklist**
+
+- ✅ Passport valid for 6+ months beyond return date
+- ✅ Return or onward flight ticket (many countries require this)
+- ✅ Proof of accommodation (hotel booking or host invitation)
+- ✅ Travel insurance with medical coverage
+- ✅ Sufficient funds (some countries ask to see bank statements)
+- ✅ Blank passport pages (at least 2 full pages for stamps)
+
+**Passport Validity Rule**
+
+Most countries require your passport to be valid for at least **6 months** after your planned return date. Check the specific rule for ${dest.split(',')[0]}.
+
+**Common Visa Types**
+
+- **Visa-Free** — enter with just your passport, stamp on arrival
+- **Visa on Arrival (VOA)** — buy a visa at the airport/border (bring USD cash)
+- **eVisa** — apply online before travel, print confirmation
+- **Embassy Visa** — must apply in advance at the consulate
+
+⚠️ *This is general guidance only — not legal advice. Requirements vary by nationality and change without notice. Always check official sources.*`;
+}
+
+function genAdvice(trip) {
+  const dest   = trip.destination;
+  const nights = daysBetween(trip.depart, trip.returnDate);
+  const types  = (trip.tripTypes||[]).map(t=>t.toLowerCase());
+  const isType = (...k) => k.some(k => types.some(t=>t.includes(k)));
+  const climate = (trip.climate||'').toLowerCase();
+
+  let out = `**💡 Travel Advice for ${dest}**\n\n`;
+
+  out += `**🔒 Safety Tips**\n\n`;
+  out += `- Research your specific neighbourhoods — check travel advisories at smartraveller.gov.au (AU), gov.uk/foreign-travel-advice (UK), or travel.state.gov (US)\n`;
+  out += `- Keep a digital copy of your passport in cloud storage (Google Drive / iCloud)\n`;
+  out += `- Share your itinerary with someone at home\n`;
+  out += `- Use hotel/hostel safes for passport and extra cash\n`;
+  out += `- Be aware of common tourist scams: fake taxi meters, "friendship bracelet" touts, card skimmers at ATMs\n\n`;
+
+  out += `**🚌 Getting Around**\n\n`;
+  out += `- Download **Google Maps** and save your destination area offline before you arrive\n`;
+  out += `- Research local ride-share apps — Uber, Grab, Bolt, Lyft, or local equivalents vary by country\n`;
+  out += `- Ask your accommodation about the safest/cheapest transport options from the airport\n`;
+  out += `- Public transport is usually the best way to experience a destination authentically\n\n`;
+
+  out += `**📱 SIM Card & Connectivity**\n\n`;
+  out += `- Buy a local SIM at the airport on arrival (usually cheapest and easiest)\n`;
+  out += `- Or set up an **eSIM** before travel — Airalo, Holafly, and Maya Mobile are popular apps\n`;
+  out += `- Check if your home carrier has an international roaming add-on (sometimes cheaper for short trips)\n`;
+  out += `- Download key content (maps, translation, guides) on WiFi before going out each day\n\n`;
+
+  out += `**💳 Money & Payments**\n\n`;
+  out += `- Notify your bank before departure to avoid card blocks\n`;
+  out += `- Use ATMs attached to banks rather than standalone street ATMs (lower skimming risk)\n`;
+  out += `- Carry some local currency cash for markets, small restaurants, and taxis\n`;
+  out += `- **Wise** or **Revolut** travel cards offer great exchange rates with low fees\n`;
+  if (isType('beach','city','backpacking')) out += `- Tipping culture varies widely — research the norm for ${dest.split(',')[0]}\n`;
+  out += `\n`;
+
+  out += `**🌍 Cultural Etiquette**\n\n`;
+  out += `- Research dress codes for religious sites — shoulders and knees often need to be covered\n`;
+  out += `- Learn a few words of the local language: "Hello", "Thank you", "Please", "Sorry" go a long way\n`;
+  out += `- Ask before photographing people, especially in rural or traditional areas\n`;
+  out += `- Research local customs around eating, greetings, and queuing\n\n`;
+
+  out += `**📲 Essential Apps to Download**\n\n`;
+  out += `- **Google Maps** (offline maps)\n`;
+  out += `- **Google Translate** (download language pack for offline use)\n`;
+  out += `- **XE Currency** (exchange rates offline)\n`;
+  out += `- **TripAdvisor / Yelp** (restaurant and attraction reviews)\n`;
+  out += `- **WhatsApp** (international communication)\n`;
+  if (isType('hiking','camping','backpacking')) out += `- **AllTrails** (offline trail maps)\n`;
+  out += `- Local ride-share app for ${dest.split(',')[0]}\n\n`;
+
+  out += `**⏰ Jet Lag Tips**\n\n`;
+  if (nights >= 3) {
+    out += `- Set your watch to destination time on the plane\n- Stay awake until local bedtime on arrival day\n- Get morning sunlight as soon as possible after arrival\n`;
+  } else {
+    out += `- For a short trip (${nights} nights), maintain your home sleep schedule if possible\n`;
+  }
+
+  return out;
+}
+
+function genHealth(trip) {
+  const dest   = trip.destination;
+  const climate = (trip.climate||'').toLowerCase();
+  const types  = (trip.tripTypes||[]).map(t=>t.toLowerCase());
+  const isType = (...k) => k.some(k => types.some(t=>t.includes(k)));
+  const isTropical = climate.includes('tropical') || climate.includes('hot') || isType('safari','beach');
+
+  let out = `**💉 Health & Vaccination Guide for ${dest}**\n\n`;
+
+  out += `⚠️ *Always consult a GP or travel medicine clinic at least 4–6 weeks before departure. This is general guidance only.*\n\n`;
+
+  out += `**✅ Vaccinations — Always Recommended**\n\n`;
+  out += `- **COVID-19** — ensure you're up to date with boosters\n`;
+  out += `- **Influenza** — recommended for all travellers, especially long-haul\n`;
+  out += `- **Hepatitis A** — recommended for most international travel\n`;
+  out += `- **Hepatitis B** — recommended if any medical procedures or adventures abroad\n`;
+  out += `- **Tetanus / Diphtheria / Pertussis (Tdap)** — ensure boosters are current\n`;
+  out += `- **MMR (Measles/Mumps/Rubella)** — confirm you're covered\n\n`;
+
+  if (isTropical) {
+    out += `**🦟 Tropical & Region-Specific Considerations**\n\n`;
+    out += `- **Malaria** — risk varies by exact region. Check CDC or WHO malaria maps. Prophylactics (Doxycycline, Malarone, Lariam) require a prescription and must be started before travel\n`;
+    out += `- **Typhoid** — recommended for travel to areas with variable food/water safety\n`;
+    out += `- **Yellow Fever** — may be required for entry (carry your Yellow Card)\n`;
+    out += `- **Dengue Fever** — no vaccine available (AU/NZ). Use strong DEET repellent and cover up at dawn/dusk\n`;
+    out += `- **Japanese Encephalitis** — for rural/outdoor travel in parts of Asia; discuss with GP\n\n`;
+  }
+
+  if (isType('hiking','camping','backpacking','safari')) {
+    out += `**🏔 Outdoor Activity Health Notes**\n\n`;
+    out += `- **Altitude Sickness** — if going above 2,500m, ascend gradually. Consider Acetazolamide (prescription). Symptoms: headache, nausea, dizziness\n`;
+    out += `- **Rabies** — if working with animals or remote areas, pre-exposure vaccine recommended\n`;
+    out += `- **Leptospirosis** — risk from freshwater activities. Avoid swimming in flood water or rivers with cattle upstream\n\n`;
+  }
+
+  out += `**🚰 Food & Water Safety**\n\n`;
+  out += `- Research whether tap water is safe to drink in ${dest.split(',')[0]}\n`;
+  out += `- When in doubt: bottled water, or boil and filter\n`;
+  out += `- "Peel it, cook it, boil it, or forget it" is a useful rule for food in higher-risk regions\n`;
+  out += `- Ice in drinks can be a risk if made from tap water\n`;
+  out += `- Street food is usually fine if it's freshly cooked and busy (high turnover = fresh)\n\n`;
+
+  out += `**🏥 Medical Preparation**\n\n`;
+  out += `- Pack a full supply of prescription medications + 7 days extra\n`;
+  out += `- Carry a letter from your GP for any controlled medications\n`;
+  out += `- Research the location of the nearest hospital and 24h pharmacy to your accommodation\n`;
+  out += `- Save the local emergency number in your phone (police, ambulance, fire)\n`;
+  out += `- Ensure your travel insurance covers emergency medical evacuation\n\n`;
+
+  out += `**🩺 Suggested Travel Health Kit**\n\n`;
+  out += `- Paracetamol & ibuprofen\n- Antihistamines (allergies & bites)\n- Imodium (diarrhoea)\n- Oral rehydration sachets\n- Antiseptic wipes & plasters\n- Blister plasters (Compeed)\n- Insect repellent (DEET 30–50%)\n`;
+  if (isTropical) out += `- Malaria prophylactics (prescription required)\n`;
+  out += `- Motion sickness tablets (if needed)\n`;
+
+  return out;
 }
 
 function buildPackItems(parsed) {
-  // Build flat item list keyed by uid from parsed AI categories
   const result = {};
   (parsed.categories || []).forEach(cat => {
     (cat.items || []).forEach(item => {
@@ -1272,37 +1540,6 @@ function buildPackItems(parsed) {
       result[id] = { id, name: item.name || item, category: cat.name, catEmoji: cat.emoji || '📦', checked: false };
     });
   });
-  return result;
-}
-
-function buildFallbackPackItems(trip) {
-  const nights = daysBetween(trip.depart, trip.returnDate);
-  const items = [
-    { name: `T-shirts × ${Math.min(nights+1, 7)}`, category:'Clothing', catEmoji:'👔' },
-    { name: 'Underwear × 7', category:'Clothing', catEmoji:'👔' },
-    { name: 'Socks × 7', category:'Clothing', catEmoji:'👔' },
-    { name: 'Comfortable walking shoes', category:'Clothing', catEmoji:'👔' },
-    { name: 'Jeans / trousers', category:'Clothing', catEmoji:'👔' },
-    { name: 'Light jacket', category:'Clothing', catEmoji:'👔' },
-    { name: 'Passport', category:'Documents & Money', catEmoji:'📄' },
-    { name: 'Travel insurance documents', category:'Documents & Money', catEmoji:'📄' },
-    { name: 'Credit / debit card', category:'Documents & Money', catEmoji:'📄' },
-    { name: 'Local currency (cash)', category:'Documents & Money', catEmoji:'📄' },
-    { name: 'Phone + charger', category:'Electronics', catEmoji:'📱' },
-    { name: 'Power bank', category:'Electronics', catEmoji:'📱' },
-    { name: 'Universal travel adapter', category:'Electronics', catEmoji:'📱' },
-    { name: 'Earbuds / headphones', category:'Electronics', catEmoji:'📱' },
-    { name: 'Toothbrush & toothpaste', category:'Toiletries & Health', catEmoji:'🧴' },
-    { name: 'Shampoo & conditioner', category:'Toiletries & Health', catEmoji:'🧴' },
-    { name: 'Deodorant', category:'Toiletries & Health', catEmoji:'🧴' },
-    { name: 'Sunscreen SPF 50+', category:'Toiletries & Health', catEmoji:'🧴' },
-    { name: 'Basic first aid kit', category:'Toiletries & Health', catEmoji:'🧴' },
-    { name: 'Main travel backpack / suitcase', category:'Gear', catEmoji:'🎒' },
-    { name: 'Day pack', category:'Gear', catEmoji:'🎒' },
-    { name: 'Packing cubes', category:'Gear', catEmoji:'🎒' },
-  ];
-  const result = {};
-  items.forEach(it => { const id = uid(); result[id] = { id, ...it, checked: false }; });
   return result;
 }
 
@@ -1725,19 +1962,11 @@ function renderProfile() {
       ${profileRow('🎂 Age', profile.age || '—')}
     </div>
   </div>`;
-
-  const apiInput = document.getElementById('api-key-input');
-  if (apiInput) apiInput.value = apiKey || '';
 }
 
 function profileRow(label, value) {
   return `<div><div style="font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px">${label}</div>
   <div style="font-size:14px;font-weight:600;color:var(--ink);margin-top:3px">${escapeHtml(value||'—')}</div></div>`;
-}
-
-function saveApiKey(val) {
-  apiKey = val.trim();
-  localStorage.setItem('pr_apikey', apiKey);
 }
 
 function showEditProfile() {

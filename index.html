@@ -613,9 +613,9 @@
         <div class="card">
           <div class="card-title" style="margin-bottom:12px">🤖 AI Settings</div>
           <div class="field">
-            <label>Anthropic API Key</label>
-            <input type="password" id="api-key-input" placeholder="sk-ant-..." oninput="saveApiKey(this.value)">
-            <div class="api-key-note">🔒 Your API key is stored only on this device in localStorage and is sent directly to Anthropic. It is never stored or transmitted anywhere else. Get yours at <strong>console.anthropic.com</strong>.</div>
+            <label>OpenAI API Key</label>
+            <input type="password" id="api-key-input" placeholder="sk-..." oninput="saveApiKey(this.value)">
+            <div class="api-key-note">🔒 Your API key is stored only on this device in localStorage and sent directly to OpenAI. It is never stored or transmitted anywhere else. Find it at <strong>platform.openai.com/api-keys</strong>.</div>
           </div>
         </div>
         <div style="margin-top:12px">
@@ -769,9 +769,9 @@ const OB_STEPS = [
   {
     title:'🤖 AI API Key',
     fields:`
-      <div class="field"><label>Anthropic API Key</label><input type="password" id="ob-apikey" placeholder="sk-ant-..."></div>
-      <div class="api-key-note">🔒 Your key is stored only on this device in localStorage and sent only to Anthropic. PackReady never sees it.</div>
-      <p style="font-size:13px;color:var(--ink-soft);margin-top:14px;line-height:1.6">You can skip this and add it later in your Profile. An API key is needed to generate AI trip guides. Get yours at <strong>console.anthropic.com</strong>.</p>
+      <div class="field"><label>OpenAI API Key</label><input type="password" id="ob-apikey" placeholder="sk-..."></div>
+      <div class="api-key-note">🔒 Your key is stored only on this device in localStorage and sent directly to OpenAI. PackReady never sees it.</div>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:14px;line-height:1.6">You can skip this and add it later in Profile. Find your key at <strong>platform.openai.com/api-keys</strong>.</p>
     `,
   },
 ];
@@ -1201,20 +1201,24 @@ async function generateSection(trip, sectionKey) {
   const bodyEl = document.getElementById(`secbody-${trip.id}-${sectionKey}`);
   if (!bodyEl) return;
 
+  if (!apiKey) {
+    renderSectionFallback(trip, sectionKey, 'No API key set — please add your OpenAI API key in the Profile tab.');
+    return;
+  }
+
   bodyEl.innerHTML = `<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-text">Generating with AI…</div></div>`;
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey || '',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'gpt-4o',
         max_tokens: sectionKey === 'packing' ? 3000 : 1200,
+        temperature: 0.7,
         messages: [
           { role: 'user', content: sectionPrompt(trip, sectionKey) }
         ],
@@ -1227,7 +1231,7 @@ async function generateSection(trip, sectionKey) {
     }
 
     const data = await resp.json();
-    const content = data.content?.[0]?.text || '';
+    const content = data.choices?.[0]?.message?.content || '';
 
     // Save to trip
     const idx = trips.findIndex(t => t.id === trip.id);

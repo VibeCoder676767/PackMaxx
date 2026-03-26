@@ -665,6 +665,13 @@
    PACKREADY — vanilla JS PWA
    ═══════════════════════════════════════════════════════════════ */
 
+// ── VERSION MIGRATION ───────────────────────────────────────────
+const APP_VERSION = "2";
+if (localStorage.getItem("pr_version") !== APP_VERSION) {
+  localStorage.removeItem("pr_apikey");
+  localStorage.setItem("pr_version", APP_VERSION);
+}
+
 // ── STATE ────────────────────────────────────────────────────────
 let profile = JSON.parse(localStorage.getItem('pr_profile') || 'null');
 let trips   = JSON.parse(localStorage.getItem('pr_trips')   || '[]');

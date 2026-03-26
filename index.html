@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="PackReady">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#4AADE8">
+  <title>PackReady</title>
+  <style>
+    /* ── RESET & BASE ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --sky:      #4AADE8;
+      --sky-deep: #2E8CC4;
+      --sky-soft: #B8DEFA;
+      --sky-pale: #E8F5FF;
+      --sky-ghost:#F0F9FF;
+      --white:    #FFFFFF;
+      --ink:      #1A2B3C;
+      --ink-mid:  #4A6278;
+      --ink-soft: #8BA5B8;
+      --ink-faint:#C8D9E6;
+      --green:    #34C759;
+      --red:      #FF3B30;
+      --orange:   #FF9500;
+      --gold:     #FFD700;
+      --radius-sm:10px;
+      --radius:   16px;
+      --radius-lg:24px;
+      --shadow-sm:0 2px 8px rgba(74,173,232,0.12);
+      --shadow:   0 4px 20px rgba(74,173,232,0.18);
+      --shadow-lg:0 8px 40px rgba(74,173,232,0.24);
+      --font: -apple-system, 'SF Pro Display', 'SF Pro Text', BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --nav-h: 83px;
+      --safe-top: env(safe-area-inset-top, 44px);
+      --safe-bot: env(safe-area-inset-bottom, 20px);
+    }
+    html, body { height: 100%; overflow: hidden; background: var(--sky-ghost); }
+    body { font-family: var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+    /* ── APP SHELL ────────────────────────────────────────────── */
+    #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+    #screens { flex: 1; overflow: hidden; position: relative; }
+    .screen {
+      position: absolute; inset: 0;
+      overflow-y: auto; overflow-x: hidden;
+      padding-top: var(--safe-top);
+      padding-bottom: calc(var(--nav-h) + 8px);
+      opacity: 0; pointer-events: none;
+      transform: translateX(20px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+    .screen.active { opacity: 1; pointer-events: auto; transform: translateX(0); }
+    .screen-inner { padding: 0 16px 20px; }
+
+    /* ── BOTTOM NAV ───────────────────────────────────────────── */
+    #nav {
+      height: var(--nav-h);
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(74,173,232,0.15);
+      display: flex; align-items: flex-start; justify-content: space-around;
+      padding-top: 10px;
+      padding-bottom: var(--safe-bot);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      background: none; border: none; cursor: pointer;
+      padding: 6px 16px; border-radius: 12px;
+      transition: transform 0.15s ease;
+      min-width: 60px;
+    }
+    .nav-btn:active { transform: scale(0.88); }
+    .nav-btn .nav-icon { font-size: 22px; line-height: 1; transition: transform 0.2s ease; }
+    .nav-btn .nav-label { font-size: 10px; font-weight: 600; color: var(--ink-soft); letter-spacing: 0.3px; transition: color 0.2s; }
+    .nav-btn.active .nav-label { color: var(--sky-deep); }
+    .nav-btn.active .nav-icon { transform: scale(1.1); }
+
+    /* ── ONBOARDING ───────────────────────────────────────────── */
+    #onboarding {
+      position: fixed; inset: 0; z-index: 100;
+      background: linear-gradient(160deg, var(--sky) 0%, var(--sky-deep) 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      overflow-y: auto; padding: calc(var(--safe-top) + 20px) 24px calc(var(--safe-bot) + 20px);
+    }
+    #onboarding.hidden { display: none; }
+    .ob-logo { font-size: 52px; margin-bottom: 8px; }
+    .ob-title { font-size: 32px; font-weight: 800; color: var(--white); letter-spacing: -0.5px; }
+    .ob-sub { font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 32px; text-align: center; }
+    .ob-card {
+      background: var(--white); border-radius: var(--radius-lg); padding: 24px;
+      width: 100%; max-width: 420px; box-shadow: var(--shadow-lg);
+    }
+    .ob-card h2 { font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 20px; }
+
+    /* ── FORMS ────────────────────────────────────────────────── */
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-mid); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 12px 14px; border-radius: var(--radius-sm);
+      border: 1.5px solid var(--ink-faint); background: var(--sky-ghost);
+      font-family: var(--font); font-size: 15px; color: var(--ink);
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      border-color: var(--sky); box-shadow: 0 0 0 3px rgba(74,173,232,0.15);
+    }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .field-row { display: flex; gap: 12px; }
+    .field-row .field { flex: 1; }
+
+    /* ── BUTTONS ──────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 24px; border-radius: var(--radius); border: none;
+      font-family: var(--font); font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;
+      width: 100%;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: linear-gradient(135deg, var(--sky) 0%, var(--sky-deep) 100%); color: var(--white); box-shadow: 0 4px 16px rgba(74,173,232,0.4); }
+    .btn-primary:active { box-shadow: 0 2px 8px rgba(74,173,232,0.3); }
+    .btn-secondary { background: var(--sky-pale); color: var(--sky-deep); }
+    .btn-danger { background: rgba(255,59,48,0.1); color: var(--red); }
+    .btn-sm { padding: 9px 16px; font-size: 14px; border-radius: var(--radius-sm); width: auto; }
+    .btn-ghost { background: none; border: 1.5px solid var(--ink-faint); color: var(--ink-mid); }
+
+    /* ── MULTI-SELECT CHIPS ───────────────────────────────────── */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+      border: 1.5px solid var(--ink-faint); color: var(--ink-mid); background: var(--white);
+      cursor: pointer; transition: all 0.15s ease; user-select: none;
+    }
+    .chip.selected { background: var(--sky); border-color: var(--sky); color: var(--white); }
+    .chip:active { transform: scale(0.94); }
+
+    /* ── CARDS ────────────────────────────────────────────────── */
+    .card {
+      background: var(--white); border-radius: var(--radius); padding: 18px;
+      box-shadow: var(--shadow-sm); margin-bottom: 12px;
+    }
+    .card-title { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+    .card-sub { font-size: 13px; color: var(--ink-mid); }
+
+    /* ── PAGE HEADERS ─────────────────────────────────────────── */
+    .page-header { padding: 20px 16px 8px; }
+    .page-header h1 { font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -0.5px; }
+    .page-header .sub { font-size: 14px; color: var(--ink-mid); margin-top: 2px; }
+
+    /* ── PROGRESS BAR ─────────────────────────────────────────── */
+    .progress-wrap { background: var(--sky-pale); border-radius: 999px; height: 8px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--sky) 0%, var(--sky-deep) 100%); transition: width 0.5s ease; }
+    .progress-label { font-size: 12px; font-weight: 600; color: var(--ink-mid); margin-top: 6px; text-align: right; }
+
+    /* ── TRIP CARD ────────────────────────────────────────────── */
+    .trip-card {
+      background: var(--white); border-radius: var(--radius-lg); padding: 20px;
+      box-shadow: var(--shadow); margin-bottom: 14px; cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+      position: relative; overflow: hidden;
+    }
+    .trip-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+      background: linear-gradient(90deg, var(--sky) 0%, var(--sky-deep) 100%);
+    }
+    .trip-card:active { transform: scale(0.98); box-shadow: var(--shadow-sm); }
+    .trip-card-dest { font-size: 20px; font-weight: 800; color: var(--ink); letter-spacing: -0.3px; }
+    .trip-card-dates { font-size: 13px; color: var(--ink-mid); margin: 4px 0 14px; }
+    .trip-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .trip-tag {
+      font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+      background: var(--sky-pale); color: var(--sky-deep);
+    }
+
+    /* ── GUIDE SECTIONS ───────────────────────────────────────── */
+    .guide-header {
+      background: linear-gradient(160deg, var(--sky) 0%, var(--sky-deep) 100%);
+      padding: calc(var(--safe-top) + 16px) 20px 20px;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .guide-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: rgba(255,255,255,0.85); font-size: 15px; font-weight: 600;
+      background: none; border: none; cursor: pointer; padding: 4px 0; margin-bottom: 12px;
+    }
+    .guide-dest { font-size: 26px; font-weight: 800; color: var(--white); letter-spacing: -0.5px; }
+    .guide-dates { font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 2px; }
+
+    .section-card {
+      background: var(--white); border-radius: var(--radius-lg); margin: 0 16px 12px;
+      box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 18px 18px; cursor: pointer; user-select: none;
+    }
+    .section-header-left { display: flex; align-items: center; gap: 12px; }
+    .section-icon { font-size: 22px; }
+    .section-title { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .section-chevron { font-size: 13px; color: var(--ink-soft); transition: transform 0.25s ease; }
+    .section-card.open .section-chevron { transform: rotate(180deg); }
+    .section-body { display: none; padding: 0 18px 18px; border-top: 1px solid var(--sky-pale); }
+    .section-card.open .section-body { display: block; }
+
+    /* ── LOADING SKELETON ─────────────────────────────────────── */
+    .loading-wrap { padding: 20px 0; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+    .loading-spinner {
+      width: 32px; height: 32px; border: 3px solid var(--sky-pale);
+      border-top-color: var(--sky); border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 14px; color: var(--ink-mid); text-align: center; }
+
+    /* ── PACKING LIST ─────────────────────────────────────────── */
+    .pack-category { margin-bottom: 20px; }
+    .pack-category-title { font-size: 13px; font-weight: 700; color: var(--ink-mid); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .pack-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--sky-pale);
+    }
+    .pack-item:last-child { border-bottom: none; }
+    .pack-check {
+      width: 24px; height: 24px; border-radius: 8px; border: 2px solid var(--ink-faint);
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.18s ease; background: var(--white);
+    }
+    .pack-check.checked { background: var(--sky); border-color: var(--sky); }
+    .pack-check.checked::after { content: '✓'; color: white; font-size: 13px; font-weight: 800; }
+    .pack-item-name { flex: 1; font-size: 15px; color: var(--ink); }
+    .pack-item-name.checked { text-decoration: line-through; color: var(--ink-soft); }
+    .pack-item-name[contenteditable="true"] { outline: none; border-bottom: 1.5px dashed var(--sky); }
+    .pack-item-delete { color: var(--ink-faint); font-size: 18px; cursor: pointer; padding: 4px; flex-shrink: 0; transition: color 0.15s; }
+    .pack-item-delete:active { color: var(--red); }
+    .add-item-row { display: flex; gap: 8px; margin-top: 12px; }
+    .add-item-input {
+      flex: 1; padding: 10px 12px; border-radius: var(--radius-sm);
+      border: 1.5px solid var(--ink-faint); font-family: var(--font); font-size: 14px;
+      background: var(--sky-ghost); outline: none; color: var(--ink);
+    }
+    .add-item-input:focus { border-color: var(--sky); }
+
+    /* ── TIMELINE ITEMS ───────────────────────────────────────── */
+    .tl-group { margin-bottom: 24px; }
+    .tl-group-title {
+      font-size: 12px; font-weight: 800; color: var(--sky-deep); text-transform: uppercase;
+      letter-spacing: 1px; padding: 8px 0; display: flex; align-items: center; gap: 8px;
+    }
+    .tl-group-title::after { content: ''; flex: 1; height: 1px; background: var(--sky-pale); }
+    .tl-item {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 12px 0; border-bottom: 1px solid var(--sky-pale);
+    }
+    .tl-item:last-child { border-bottom: none; }
+    .tl-check {
+      width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--ink-faint);
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.18s ease; margin-top: 1px;
+      background: var(--white);
+    }
+    .tl-check.checked { background: var(--green); border-color: var(--green); }
+    .tl-check.checked::after { content: '✓'; color: white; font-size: 12px; font-weight: 800; }
+    .tl-item-content { flex: 1; }
+    .tl-item-label { font-size: 15px; color: var(--ink); line-height: 1.35; }
+    .tl-item-label.checked { text-decoration: line-through; color: var(--ink-soft); }
+    .tl-item-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+    /* ── HOME SCREEN ──────────────────────────────────────────── */
+    .home-hero {
+      background: linear-gradient(160deg, var(--sky) 0%, var(--sky-deep) 100%);
+      padding: calc(var(--safe-top) + 20px) 20px 28px; margin-bottom: 0;
+    }
+    .home-greeting { font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500; margin-bottom: 4px; }
+    .home-name { font-size: 28px; font-weight: 800; color: var(--white); letter-spacing: -0.5px; }
+    .home-tagline { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 4px; }
+    .home-new-btn {
+      margin: 20px 16px 4px;
+      background: linear-gradient(135deg, var(--sky) 0%, var(--sky-deep) 100%);
+      color: var(--white); border: none; border-radius: var(--radius-lg); padding: 18px 24px;
+      width: calc(100% - 32px); display: flex; align-items: center; justify-content: center; gap: 10px;
+      font-family: var(--font); font-size: 17px; font-weight: 800;
+      box-shadow: 0 6px 24px rgba(74,173,232,0.5); cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease; letter-spacing: -0.2px;
+    }
+    .home-new-btn:active { transform: scale(0.97); box-shadow: 0 3px 12px rgba(74,173,232,0.35); }
+
+    /* ── MODAL / SHEET ────────────────────────────────────────── */
+    .sheet-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
+      opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+    }
+    .sheet-overlay.visible { opacity: 1; pointer-events: auto; }
+    .sheet {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 51;
+      background: var(--white); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: 12px 20px calc(var(--safe-bot) + 20px);
+      max-height: 92vh; overflow-y: auto;
+      transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+    }
+    .sheet.visible { transform: translateY(0); }
+    .sheet-handle { width: 36px; height: 4px; border-radius: 2px; background: var(--ink-faint); margin: 0 auto 20px; }
+    .sheet-title { font-size: 20px; font-weight: 800; color: var(--ink); margin-bottom: 20px; }
+
+    /* ── GUIDE VIEW (sub-screen) ──────────────────────────────── */
+    #guide-view {
+      position: fixed; inset: 0; z-index: 40;
+      background: var(--sky-ghost);
+      transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+      overflow-y: auto;
+      padding-bottom: 30px;
+    }
+    #guide-view.visible { transform: translateX(0); }
+
+    /* ── PROFILE ──────────────────────────────────────────────── */
+    .profile-avatar {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--sky) 0%, var(--sky-deep) 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; flex-shrink: 0;
+    }
+    .profile-name { font-size: 22px; font-weight: 800; color: var(--ink); }
+    .profile-meta { font-size: 14px; color: var(--ink-mid); }
+
+    /* ── ALERT / TOAST ────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: calc(var(--nav-h) + 20px); left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--ink); color: var(--white);
+      padding: 12px 20px; border-radius: var(--radius); font-size: 14px; font-weight: 600;
+      white-space: nowrap; z-index: 200; opacity: 0; transition: all 0.3s ease;
+      pointer-events: none; box-shadow: var(--shadow-lg);
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── CONFETTI / COMPLETION ────────────────────────────────── */
+    .completion-banner {
+      background: linear-gradient(135deg, #34C759 0%, #30B352 100%);
+      border-radius: var(--radius-lg); padding: 24px; text-align: center;
+      margin: 16px; box-shadow: 0 6px 24px rgba(52,199,89,0.35);
+    }
+    .completion-banner h2 { font-size: 22px; font-weight: 800; color: white; margin-bottom: 8px; }
+    .completion-banner p { font-size: 15px; color: rgba(255,255,255,0.9); margin-bottom: 16px; }
+
+    /* ── ARCHIVE BADGE ────────────────────────────────────────── */
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge-archive { background: var(--sky-pale); color: var(--sky-deep); }
+    .badge-active { background: rgba(52,199,89,0.12); color: #28A347; }
+
+    /* ── SECTION CONTENT PROSE ────────────────────────────────── */
+    .guide-prose { font-size: 14px; line-height: 1.7; color: var(--ink-mid); }
+    .guide-prose strong { color: var(--ink); font-weight: 700; }
+    .guide-prose ul { margin: 8px 0 8px 16px; }
+    .guide-prose ul li { margin-bottom: 4px; }
+    .guide-prose p { margin-bottom: 10px; }
+    .guide-prose h4 { font-size: 14px; font-weight: 700; color: var(--ink); margin: 14px 0 6px; }
+
+    /* ── STEP INDICATOR ───────────────────────────────────────── */
+    .step-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; }
+    .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); transition: background 0.2s; }
+    .step-dot.active { background: var(--sky); width: 24px; border-radius: 4px; }
+
+    /* ── EMPTY STATE ──────────────────────────────────────────── */
+    .empty-state { text-align: center; padding: 48px 24px; }
+    .empty-state .empty-icon { font-size: 56px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+    .empty-state p { font-size: 14px; color: var(--ink-mid); line-height: 1.6; }
+
+    /* ── NEW TRIP FORM SCREEN ─────────────────────────────────── */
+    #new-trip-screen {
+      position: fixed; inset: 0; z-index: 45;
+      background: var(--sky-ghost); overflow-y: auto;
+      padding-bottom: 40px;
+      transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+    }
+    #new-trip-screen.visible { transform: translateX(0); }
+    .new-trip-header {
+      background: linear-gradient(160deg, var(--sky) 0%, var(--sky-deep) 100%);
+      padding: calc(var(--safe-top) + 16px) 20px 20px;
+    }
+    .new-trip-header h1 { font-size: 24px; font-weight: 800; color: white; }
+    .new-trip-header p { font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+
+    /* ── API KEY WARNING ──────────────────────────────────────── */
+    .api-key-note {
+      font-size: 12px; color: var(--ink-soft); background: var(--sky-ghost);
+      border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px;
+      border-left: 3px solid var(--sky);
+    }
+
+    /* ── DIVIDER ──────────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--sky-pale); margin: 16px 0; }
+
+    /* ── ANIMATIONS ───────────────────────────────────────────── */
+    @keyframes checkPop { 0%{transform:scale(1)} 50%{transform:scale(1.35)} 100%{transform:scale(1)} }
+    .check-pop { animation: checkPop 0.25s ease; }
+    @keyframes fadeInUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in-up { animation: fadeInUp 0.35s ease forwards; }
+
+    /* ── SCROLLBAR ────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 0; height: 0; }
+
+    /* ── SECTION ERROR ────────────────────────────────────────── */
+    .section-error { padding: 16px; background: rgba(255,59,48,0.06); border-radius: var(--radius-sm); }
+    .section-error p { font-size: 14px; color: var(--red); }
+    .section-error button { margin-top: 10px; }
+
+    /* ── TRIP SELECTOR ────────────────────────────────────────── */
+    .trip-selector-wrap { padding: 12px 16px 4px; }
+    .trip-selector {
+      width: 100%; padding: 10px 14px; border-radius: var(--radius);
+      border: 1.5px solid var(--ink-faint); background: var(--white);
+      font-family: var(--font); font-size: 15px; font-weight: 600; color: var(--ink);
+      outline: none; -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238BA5B8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── ONBOARDING ──────────────────────────────────────────────── -->
+<div id="onboarding">
+  <div class="ob-logo">🌍</div>
+  <div class="ob-title">PackReady</div>
+  <div class="ob-sub">Your AI-powered travel companion</div>
+  <div class="ob-card">
+    <div class="step-dots" id="ob-dots"></div>
+    <div id="ob-steps"></div>
+  </div>
+</div>
+
+<!-- ── GUIDE VIEW ──────────────────────────────────────────────── -->
+<div id="guide-view">
+  <div class="guide-header">
+    <button class="guide-back" onclick="closeGuide()">‹ Back</button>
+    <div class="guide-dest" id="gv-dest"></div>
+    <div class="guide-dates" id="gv-dates"></div>
+  </div>
+  <div id="guide-sections"></div>
+  <div style="height:40px"></div>
+</div>
+
+<!-- ── NEW TRIP FORM ───────────────────────────────────────────── -->
+<div id="new-trip-screen">
+  <div class="new-trip-header">
+    <button class="guide-back" onclick="closeNewTrip()" style="margin-bottom:8px">‹ Cancel</button>
+    <h1>✈️ New Adventure</h1>
+    <p>Tell us about your trip</p>
+  </div>
+  <div style="padding:20px 16px">
+    <div id="new-trip-form">
+
+      <div class="field">
+        <label>🌍 Destination(s)</label>
+        <input type="text" id="nt-dest" placeholder="e.g. Tokyo, Japan" required>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>🛫 Departure</label>
+          <input type="date" id="nt-depart" required>
+        </div>
+        <div class="field">
+          <label>🛬 Return</label>
+          <input type="date" id="nt-return" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>🎒 Trip Type (select all that apply)</label>
+        <div class="chips" id="nt-types">
+          <div class="chip" onclick="toggleChip(this)">🏖 Beach</div>
+          <div class="chip" onclick="toggleChip(this)">🏙 City Break</div>
+          <div class="chip" onclick="toggleChip(this)">🥾 Hiking</div>
+          <div class="chip" onclick="toggleChip(this)">⛺ Camping</div>
+          <div class="chip" onclick="toggleChip(this)">💼 Business</div>
+          <div class="chip" onclick="toggleChip(this)">🎪 Festival</div>
+          <div class="chip" onclick="toggleChip(this)">🚗 Road Trip</div>
+          <div class="chip" onclick="toggleChip(this)">⛷ Winter Sports</div>
+          <div class="chip" onclick="toggleChip(this)">🎒 Backpacking</div>
+          <div class="chip" onclick="toggleChip(this)">🦁 Safari</div>
+          <div class="chip" onclick="toggleChip(this)">✨ Other</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>🌡 Climate</label>
+        <div class="chips" id="nt-climate">
+          <div class="chip" onclick="toggleChipSingle(this,'nt-climate')">☀️ Hot</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-climate')">❄️ Cold</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-climate')">🌤 Mixed</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-climate')">🌴 Tropical</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-climate')">🏜 Desert</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-climate')">🧊 Arctic</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>🛏 Accommodation</label>
+        <div class="chips" id="nt-accom">
+          <div class="chip" onclick="toggleChipSingle(this,'nt-accom')">🏨 Hotel</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-accom')">🛏 Hostel</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-accom')">⛺ Camping</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-accom')">🏠 Airbnb</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-accom')">🔀 Mixed</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>👥 Travel Companions</label>
+        <div class="chips" id="nt-comp">
+          <div class="chip" onclick="toggleChipSingle(this,'nt-comp')">🧍 Solo</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-comp')">💑 Couple</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-comp')">👨‍👩‍👧 Family</div>
+          <div class="chip" onclick="toggleChipSingle(this,'nt-comp')">👫 Group</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>🎯 Activities Planned</label>
+        <textarea id="nt-activities" placeholder="e.g. scuba diving, temple visits, street food tours, photography..."></textarea>
+      </div>
+
+      <div class="field">
+        <label>📝 Special Notes</label>
+        <textarea id="nt-notes" placeholder="Medications, dietary needs, mobility requirements, visa status..."></textarea>
+      </div>
+
+      <button type="button" class="btn btn-primary" style="margin-top:8px" onclick="submitNewTrip()">
+        🚀 Generate My Trip Guide
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ────────────────────────────────────────────────── -->
+<div id="app">
+  <div id="screens">
+
+    <!-- HOME -->
+    <div class="screen" id="screen-home">
+      <div class="home-hero">
+        <div class="home-greeting" id="home-greeting">Good morning ✨</div>
+        <div class="home-name" id="home-name">Traveller</div>
+        <div class="home-tagline" id="home-tagline">Where to next?</div>
+      </div>
+      <button class="home-new-btn" onclick="openNewTrip()">
+        ✈️ New Adventure
+      </button>
+      <div style="padding:0 16px;margin-top:20px">
+        <div style="font-size:17px;font-weight:800;color:var(--ink);margin-bottom:12px">Active Trips</div>
+        <div id="home-trips"></div>
+      </div>
+    </div>
+
+    <!-- TRIPS -->
+    <div class="screen" id="screen-trips">
+      <div class="page-header">
+        <h1>✈️ My Trips</h1>
+        <div class="sub">Tap a trip to view your guide</div>
+      </div>
+      <div class="screen-inner">
+        <button class="btn btn-primary" onclick="openNewTrip()" style="margin-bottom:20px">
+          + New Adventure
+        </button>
+        <div style="font-size:13px;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">ACTIVE</div>
+        <div id="trips-active"></div>
+        <div id="trips-archive-section" style="display:none">
+          <div style="font-size:13px;font-weight:700;color:var(--ink-mid);text-transform:uppercase;letter-spacing:0.8px;margin:20px 0 10px">ARCHIVED</div>
+          <div id="trips-archived"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="screen" id="screen-timeline">
+      <div class="page-header">
+        <h1>📅 Timeline</h1>
+        <div class="sub">Your preparation checklist</div>
+      </div>
+      <div class="trip-selector-wrap">
+        <select class="trip-selector" id="tl-trip-select" onchange="renderTimeline()"></select>
+      </div>
+      <div class="screen-inner" style="padding-top:12px">
+        <div id="tl-progress-wrap" style="display:none;margin-bottom:20px">
+          <div class="card" style="padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div style="font-size:15px;font-weight:700;color:var(--ink)">Trip Readiness</div>
+              <div style="font-size:15px;font-weight:800;color:var(--sky-deep)" id="tl-pct">0%</div>
+            </div>
+            <div class="progress-wrap"><div class="progress-bar" id="tl-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div id="tl-content"></div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="screen" id="screen-profile">
+      <div class="page-header">
+        <h1>👤 Profile</h1>
+        <div class="sub">Your traveller details</div>
+      </div>
+      <div class="screen-inner">
+        <div id="profile-display"></div>
+        <div class="divider"></div>
+        <div class="card">
+          <div class="card-title" style="margin-bottom:12px">🤖 AI Settings</div>
+          <div class="field">
+            <label>Anthropic API Key</label>
+            <input type="password" id="api-key-input" placeholder="sk-ant-..." oninput="saveApiKey(this.value)">
+            <div class="api-key-note">🔒 Your API key is stored only on this device in localStorage and is sent directly to Anthropic. It is never stored or transmitted anywhere else. Get yours at <strong>console.anthropic.com</strong>.</div>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn btn-secondary" onclick="showEditProfile()">Edit Profile</button>
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn btn-danger btn-sm" style="width:100%" onclick="confirmResetApp()">Reset App Data</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /screens -->
+
+  <!-- BOTTOM NAV -->
+  <nav id="nav">
+    <button class="nav-btn active" id="nav-home" onclick="showTab('home')">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-btn" id="nav-trips" onclick="showTab('trips')">
+      <span class="nav-icon">✈️</span>
+      <span class="nav-label">Trips</span>
+    </button>
+    <button class="nav-btn" id="nav-timeline" onclick="showTab('timeline')">
+      <span class="nav-icon">📅</span>
+      <span class="nav-label">Timeline</span>
+    </button>
+    <button class="nav-btn" id="nav-profile" onclick="showTab('profile')">
+      <span class="nav-icon">👤</span>
+      <span class="nav-label">Profile</span>
+    </button>
+  </nav>
+</div><!-- /app -->
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- SHEET OVERLAY -->
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div id="sheet-content"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   PACKREADY — vanilla JS PWA
+   ═══════════════════════════════════════════════════════════════ */
+
+// ── STATE ────────────────────────────────────────────────────────
+let profile = JSON.parse(localStorage.getItem('pr_profile') || 'null');
+let trips   = JSON.parse(localStorage.getItem('pr_trips')   || '[]');
+let apiKey  = localStorage.getItem('pr_apikey') || '';
+let currentTab = 'home';
+
+function save() {
+  localStorage.setItem('pr_profile', JSON.stringify(profile));
+  localStorage.setItem('pr_trips',   JSON.stringify(trips));
+}
+
+// ── UTILS ────────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function toast(msg, dur=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+}
+
+function daysBetween(a, b) {
+  return Math.round((new Date(b) - new Date(a)) / 86400000);
+}
+
+function daysUntil(d) {
+  return daysBetween(new Date().toISOString().slice(0,10), d);
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning ☀️';
+  if (h < 17) return 'Good afternoon 🌤';
+  return 'Good evening 🌙';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── TAB NAVIGATION ───────────────────────────────────────────────
+function showTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  if (tab === 'home') renderHome();
+  if (tab === 'trips') renderTrips();
+  if (tab === 'timeline') renderTimelineTab();
+  if (tab === 'profile') renderProfile();
+}
+
+// ── ONBOARDING ───────────────────────────────────────────────────
+const OB_STEPS = [
+  {
+    title:'👋 Welcome to PackReady',
+    fields: `
+      <div class="field"><label>Full Name</label><input type="text" id="ob-name" placeholder="Your name" required></div>
+      <div class="field-row">
+        <div class="field"><label>Age</label><input type="number" id="ob-age" placeholder="28" min="10" max="120"></div>
+        <div class="field"><label>Gender</label>
+          <select id="ob-gender">
+            <option value="">–</option>
+            <option>Male</option><option>Female</option><option>Non-binary</option><option>Prefer not to say</option>
+          </select>
+        </div>
+      </div>
+    `,
+  },
+  {
+    title:'🌏 Where are you from?',
+    fields:`
+      <div class="field"><label>Home Country</label><input type="text" id="ob-country" placeholder="Australia" required></div>
+      <div class="field"><label>Home City</label><input type="text" id="ob-city" placeholder="Sydney"></div>
+      <div class="field"><label>Passport Nationality</label><input type="text" id="ob-passport" placeholder="Australian" required></div>
+      <div class="field"><label>Passport Expiry</label><input type="date" id="ob-passport-exp"></div>
+    `,
+  },
+  {
+    title:'📐 Your measurements',
+    fields:`
+      <div class="field-row">
+        <div class="field"><label>Height (cm)</label><input type="number" id="ob-height" placeholder="175" min="100" max="250"></div>
+        <div class="field"><label>Weight (kg)</label><input type="number" id="ob-weight" placeholder="70" min="30" max="300"></div>
+      </div>
+      <div class="field"><label>Travel Experience</label>
+        <select id="ob-exp">
+          <option value="Beginner">🌱 Beginner — a few trips abroad</option>
+          <option value="Intermediate">🧭 Intermediate — comfortable traveller</option>
+          <option value="Experienced">🗺 Experienced — seasoned explorer</option>
+        </select>
+      </div>
+    `,
+  },
+  {
+    title:'🤖 AI API Key',
+    fields:`
+      <div class="field"><label>Anthropic API Key</label><input type="password" id="ob-apikey" placeholder="sk-ant-..."></div>
+      <div class="api-key-note">🔒 Your key is stored only on this device in localStorage and sent only to Anthropic. PackReady never sees it.</div>
+      <p style="font-size:13px;color:var(--ink-soft);margin-top:14px;line-height:1.6">You can skip this and add it later in your Profile. An API key is needed to generate AI trip guides. Get yours at <strong>console.anthropic.com</strong>.</p>
+    `,
+  },
+];
+
+let obStep = 0;
+
+function renderOnboarding() {
+  const dots = document.getElementById('ob-dots');
+  dots.innerHTML = OB_STEPS.map((_,i) =>
+    `<div class="step-dot ${i===obStep?'active':''}"></div>`
+  ).join('');
+  const step = OB_STEPS[obStep];
+  const isLast = obStep === OB_STEPS.length - 1;
+  document.getElementById('ob-steps').innerHTML = `
+    <h2 style="margin-bottom:20px">${step.title}</h2>
+    ${step.fields}
+    <div style="display:flex;gap:10px;margin-top:8px">
+      ${obStep > 0 ? `<button type="button" class="btn btn-ghost" style="flex:1" onclick="obBack()">Back</button>` : ''}
+      <button type="button" class="btn btn-primary" style="flex:2" onclick="obNext()">
+        ${isLast ? '🚀 Get Started' : 'Continue →'}
+      </button>
+    </div>
+  `;
+}
+
+function obNext() {
+  if (obStep === 0) {
+    const name = document.getElementById('ob-name')?.value.trim();
+    if (!name) { toast('Please enter your name 👋'); return; }
+    profile = profile || {};
+    profile.name = name;
+    profile.age  = document.getElementById('ob-age')?.value || '';
+    profile.gender = document.getElementById('ob-gender')?.value || '';
+  } else if (obStep === 1) {
+    const country = document.getElementById('ob-country')?.value.trim();
+    const passport = document.getElementById('ob-passport')?.value.trim();
+    if (!country || !passport) { toast('Please fill in country & passport'); return; }
+    profile.country = country;
+    profile.city = document.getElementById('ob-city')?.value.trim() || '';
+    profile.passport = passport;
+    profile.passportExp = document.getElementById('ob-passport-exp')?.value || '';
+  } else if (obStep === 2) {
+    profile.height = document.getElementById('ob-height')?.value || '';
+    profile.weight = document.getElementById('ob-weight')?.value || '';
+    profile.experience = document.getElementById('ob-exp')?.value || 'Intermediate';
+  } else if (obStep === 3) {
+    const key = document.getElementById('ob-apikey')?.value.trim();
+    if (key) { apiKey = key; localStorage.setItem('pr_apikey', key); }
+  }
+  save();
+  if (obStep < OB_STEPS.length - 1) {
+    obStep++;
+    renderOnboarding();
+  } else {
+    // Done!
+    document.getElementById('onboarding').classList.add('hidden');
+    initApp();
+  }
+}
+
+function obBack() {
+  if (obStep > 0) { obStep--; renderOnboarding(); }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────
+function initApp() {
+  if (apiKey) document.getElementById('api-key-input').value = apiKey;
+  showTab('home');
+}
+
+function boot() {
+  if (!profile) {
+    renderOnboarding();
+  } else {
+    document.getElementById('onboarding').classList.add('hidden');
+    initApp();
+  }
+}
+
+// ── HOME ─────────────────────────────────────────────────────────
+function renderHome() {
+  document.getElementById('home-greeting').textContent = greeting();
+  document.getElementById('home-name').textContent = profile ? (profile.name.split(' ')[0] || 'Traveller') : 'Traveller';
+  const activeTrips = trips.filter(t => t.status === 'active');
+  const homeTrips = document.getElementById('home-trips');
+  if (activeTrips.length === 0) {
+    homeTrips.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🌍</div>
+      <h3>No active trips yet</h3>
+      <p>Tap "New Adventure" above to plan your first trip.</p>
+    </div>`;
+    return;
+  }
+  homeTrips.innerHTML = activeTrips.map(t => {
+    const pct = tripProgress(t);
+    return `<div class="trip-card" onclick="openGuide('${t.id}')">
+      <div class="trip-card-dest">${escapeHtml(t.destination)}</div>
+      <div class="trip-card-dates">📅 ${formatDate(t.depart)} → ${formatDate(t.returnDate)}</div>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+      <div class="progress-label">${pct}% ready</div>
+    </div>`;
+  }).join('');
+}
+
+// ── TRIPS TAB ────────────────────────────────────────────────────
+function renderTrips() {
+  const active   = trips.filter(t => t.status === 'active');
+  const archived = trips.filter(t => t.status === 'archived');
+
+  const renderCard = (t) => {
+    const pct = tripProgress(t);
+    const types = (t.tripTypes || []).slice(0,3).join(' ');
+    return `<div class="trip-card" onclick="openGuide('${t.id}')">
+      ${t.status === 'archived' ? '<div style="position:absolute;top:12px;right:12px"><span class="badge badge-archive">📦 Archived</span></div>' : ''}
+      <div class="trip-card-dest">${escapeHtml(t.destination)}</div>
+      <div class="trip-card-dates">📅 ${formatDate(t.depart)} → ${formatDate(t.returnDate)}</div>
+      <div class="trip-card-tags">
+        ${(t.tripTypes||[]).map(tt => `<span class="trip-tag">${tt}</span>`).join('')}
+        ${t.climate ? `<span class="trip-tag">${t.climate}</span>` : ''}
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+      <div class="progress-label">${pct}% ready</div>
+    </div>`;
+  };
+
+  document.getElementById('trips-active').innerHTML =
+    active.length ? active.map(renderCard).join('') :
+    `<div class="empty-state"><div class="empty-icon">✈️</div><h3>No active trips</h3><p>Start planning your next adventure!</p></div>`;
+
+  if (archived.length) {
+    document.getElementById('trips-archive-section').style.display = 'block';
+    document.getElementById('trips-archived').innerHTML = archived.map(renderCard).join('');
+  } else {
+    document.getElementById('trips-archive-section').style.display = 'none';
+  }
+}
+
+// ── NEW TRIP ──────────────────────────────────────────────────────
+function openNewTrip() {
+  const s = document.getElementById('new-trip-screen');
+  s.classList.add('visible');
+  // Set default dates
+  const today = new Date().toISOString().slice(0,10);
+  const next  = new Date(Date.now() + 30*86400000).toISOString().slice(0,10);
+  document.getElementById('nt-depart').value = today;
+  document.getElementById('nt-return').value = next;
+}
+
+function closeNewTrip() {
+  document.getElementById('new-trip-screen').classList.remove('visible');
+}
+
+function toggleChip(el) {
+  el.classList.toggle('selected');
+}
+
+function toggleChipSingle(el, groupId) {
+  document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function getSelectedChips(containerId) {
+  return Array.from(document.querySelectorAll(`#${containerId} .chip.selected`))
+    .map(c => c.textContent.trim());
+}
+
+function submitNewTrip() {
+  const dest    = document.getElementById('nt-dest').value.trim();
+  const depart  = document.getElementById('nt-depart').value;
+  const ret     = document.getElementById('nt-return').value;
+  const types   = getSelectedChips('nt-types');
+  const climate = getSelectedChips('nt-climate')[0] || '';
+  const accom   = getSelectedChips('nt-accom')[0] || '';
+  const companions = getSelectedChips('nt-comp')[0] || '';
+  const activities = document.getElementById('nt-activities').value.trim();
+  const notes   = document.getElementById('nt-notes').value.trim();
+
+  if (!dest) { toast('Please enter a destination 🌍'); return; }
+  if (!depart) { toast('Please set a departure date 📅'); return; }
+  if (!ret) { toast('Please set a return date 📅'); return; }
+  if (new Date(ret) <= new Date(depart)) { toast('Return must be after departure'); return; }
+
+  const trip = {
+    id: uid(),
+    destination: dest,
+    depart, returnDate: ret,
+    tripTypes: types,
+    climate, accom, companions, activities, notes,
+    status: 'active',
+    createdAt: Date.now(),
+    sections: {},
+    packState: {},
+    packItems: {},
+    tlState: {},
+  };
+
+  trips.push(trip);
+  save();
+  closeNewTrip();
+
+  // Clear form fields manually
+  document.getElementById('nt-dest').value = '';
+  document.getElementById('nt-activities').value = '';
+  document.getElementById('nt-notes').value = '';
+  document.querySelectorAll('#new-trip-screen .chip.selected').forEach(c => c.classList.remove('selected'));
+
+  // Navigate to guide
+  renderTrips();
+  openGuide(trip.id);
+}
+
+// ── GUIDE VIEW ────────────────────────────────────────────────────
+let currentTripId = null;
+
+function openGuide(tripId) {
+  const trip = trips.find(t => t.id === tripId);
+  if (!trip) return;
+  currentTripId = tripId;
+
+  document.getElementById('gv-dest').textContent = trip.destination;
+  document.getElementById('gv-dates').textContent =
+    `${formatDate(trip.depart)} → ${formatDate(trip.returnDate)} · ${daysBetween(trip.depart, trip.returnDate)} nights`;
+
+  document.getElementById('guide-view').classList.add('visible');
+  renderGuideSections(trip);
+}
+
+function closeGuide() {
+  document.getElementById('guide-view').classList.remove('visible');
+  currentTripId = null;
+  renderTrips();
+  renderHome();
+  renderTimelineTab();
+}
+
+// ── GUIDE SECTIONS ────────────────────────────────────────────────
+const SECTIONS = [
+  { key: 'packing',  icon: '🎒', title: 'Packing List' },
+  { key: 'bag',      icon: '🧳', title: 'Bag Size Recommendation' },
+  { key: 'visa',     icon: '📋', title: 'Visa & Entry Requirements' },
+  { key: 'advice',   icon: '💡', title: 'Travel Advice' },
+  { key: 'health',   icon: '💉', title: 'Health & Vaccinations' },
+];
+
+function renderGuideSections(trip) {
+  const container = document.getElementById('guide-sections');
+  container.innerHTML = '';
+
+  SECTIONS.forEach(sec => {
+    const card = document.createElement('div');
+    card.className = 'section-card';
+    card.id = `sec-${trip.id}-${sec.key}`;
+    card.innerHTML = `
+      <div class="section-header" onclick="toggleSection(this.parentElement)">
+        <div class="section-header-left">
+          <span class="section-icon">${sec.icon}</span>
+          <span class="section-title">${sec.title}</span>
+        </div>
+        <span class="section-chevron">▼</span>
+      </div>
+      <div class="section-body" id="secbody-${trip.id}-${sec.key}">
+        <div class="loading-wrap">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">Generating personalised content…</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+    // Open first section by default
+    if (sec.key === 'packing') card.classList.add('open');
+  });
+
+  // Kick off AI calls (or restore cached)
+  SECTIONS.forEach(sec => {
+    if (trip.sections[sec.key]) {
+      renderSectionContent(trip, sec.key);
+    } else {
+      generateSection(trip, sec.key);
+    }
+  });
+}
+
+function toggleSection(card) {
+  card.classList.toggle('open');
+}
+
+// ── AI GENERATION ─────────────────────────────────────────────────
+function buildProfile() {
+  if (!profile) return 'Traveller profile not set.';
+  return `Traveller profile: ${profile.name}, ${profile.age || 'age unknown'}, ${profile.gender || ''}, from ${profile.city || ''} ${profile.country || ''}, passport: ${profile.passport}, experience level: ${profile.experience || 'Intermediate'}, height: ${profile.height || 'unknown'}cm, weight: ${profile.weight || 'unknown'}kg.`;
+}
+
+function buildTripContext(trip) {
+  const nights = daysBetween(trip.depart, trip.returnDate);
+  return `Trip details: Destination: ${trip.destination}. Dates: ${trip.depart} to ${trip.returnDate} (${nights} nights). Trip types: ${(trip.tripTypes||[]).join(', ')||'general'}. Climate: ${trip.climate||'unknown'}. Accommodation: ${trip.accom||'unknown'}. Companions: ${trip.companions||'solo'}. Activities: ${trip.activities||'general tourism'}. Special notes: ${trip.notes||'none'}.`;
+}
+
+function sectionPrompt(trip, sectionKey) {
+  const prof = buildProfile();
+  const ctx  = buildTripContext(trip);
+  const nights = daysBetween(trip.depart, trip.returnDate);
+
+  const prompts = {
+    packing: `You are a world-class packing expert who draws from ultralight packing communities, Reddit's r/onebag, r/travel, r/ultralight, destination-specific expat forums, and mainstream travel resources.
+${prof}
+${ctx}
+
+Generate a comprehensive, highly personalized packing list for this exact trip. Use the traveller's height/weight for clothing size context and bag fit. Consider the duration (${nights} nights), climate, activities, and accommodation type.
+
+Return ONLY a JSON object with this structure (no markdown, no preamble):
+{
+  "categories": [
+    {
+      "name": "Clothing",
+      "emoji": "👔",
+      "items": [
+        {"name": "Moisture-wicking T-shirts × 3", "qty": "3"},
+        ...
+      ]
+    },
+    {
+      "name": "Gear",
+      "emoji": "🎒",
+      "items": [...]
+    },
+    {
+      "name": "Accessories",
+      "emoji": "🕶",
+      "items": [...]
+    },
+    {
+      "name": "Toiletries & Health",
+      "emoji": "🧴",
+      "items": [...]
+    },
+    {
+      "name": "Documents & Money",
+      "emoji": "📄",
+      "items": [...]
+    },
+    {
+      "name": "Electronics",
+      "emoji": "📱",
+      "items": [...]
+    },
+    {
+      "name": "Trip Essentials",
+      "emoji": "⭐",
+      "items": [...]
+    }
+  ]
+}
+
+Include specific quantities (e.g. "3× T-shirts", "1× Rain jacket") for all clothing. Be specific to ${trip.destination}, the climate (${trip.climate}), and activities planned. Add non-obvious items from experienced travellers and packing communities. Total items: aim for 50-80 highly relevant items.`,
+
+    bag: `You are a gear expert who advises travellers on optimal bag configurations. Draw from r/onebag, r/ultralight, r/travel, gear review sites, and experienced traveller forums.
+${prof}
+${ctx}
+
+Provide a detailed bag size recommendation for this traveller and trip. Consider their height/weight for fit, trip duration (${nights} nights), activities, and accommodation type.
+
+Return your response as plain text with markdown-style formatting (use **bold** for headings, - for bullets). Include:
+1. Recommended bag configuration (e.g. "40L carry-on + small daypack")
+2. Why this size is optimal for this trip
+3. Specific bag recommendations by category (brand suggestions welcome)
+4. Tips for packing efficiently for this trip type
+5. What to leave at home
+Be specific, practical, and opinionated. Draw from community wisdom.`,
+
+    visa: `You are a visa and immigration expert. Draw from official government sources, Timatic, IATA, r/travel visa megathreads, and expat communities.
+${prof}
+${ctx}
+
+Provide visa and entry requirement information for a ${profile ? profile.passport : 'Australian'} passport holder entering ${trip.destination}.
+
+Return plain text with markdown-style formatting. Include:
+1. Visa requirement status (visa-free / visa on arrival / e-visa / full visa required)
+2. Maximum stay allowed
+3. Application process and links if needed
+4. Passport validity requirements
+5. Any entry requirements (proof of onward travel, hotel bookings, funds)
+6. COVID/health entry requirements if any current
+7. Important note to always verify with official embassy/consulate
+
+⚠️ Always remind the traveller to verify with official sources as requirements change frequently.`,
+
+    advice: `You are a seasoned traveller and destination expert who curates advice from locals, expats, r/travel, destination-specific subreddits, Lonely Planet forums, and niche travel communities.
+${prof}
+${ctx}
+
+Provide rich, specific travel advice for ${trip.destination} tailored to this exact trip.
+
+Return plain text with markdown-style formatting. Include:
+1. **Safety** — neighbourhood safety, common scams targeting tourists, what to avoid
+2. **Getting Around** — best local transport options, apps to download, taxi vs rideshare
+3. **SIM Card & Connectivity** — best local SIM options, coverage, data costs
+4. **Money & Tipping** — cash vs card, ATM tips, tipping culture expectations
+5. **Cultural Customs** — dress codes, etiquette, things that might surprise a ${profile ? profile.country : 'Western'} traveller
+6. **Hidden Gems** — non-obvious tips from locals and long-term travellers
+7. **Apps to Download** — essential apps for this destination
+
+Be specific to ${trip.destination}, not generic. Draw from community knowledge.`,
+
+    health: `You are a travel medicine expert who draws from WHO guidelines, CDC Travel Health, travel medicine clinics, and r/travel health discussions.
+${prof}
+${ctx}
+
+Provide health and vaccination advice for travel to ${trip.destination}.
+
+Return plain text with markdown-style formatting. Include:
+1. **Recommended Vaccinations** — list each with urgency level
+2. **Required Vaccinations** — any mandatory jabs for entry
+3. **Malaria Risk** — prophylactic recommendations if applicable
+4. **Food & Water Safety** — tap water, street food guidance
+5. **Health Insurance** — what to look for in travel insurance for this destination
+6. **Medications to Pack** — specific recommendations for this climate/region
+7. **Medical Facilities** — hospital quality, payment expectations
+8. **Emergency Numbers** — local emergency contacts
+
+⚠️ Remind the traveller to consult a travel medicine clinic or GP before departure.`,
+  };
+
+  return prompts[sectionKey];
+}
+
+async function generateSection(trip, sectionKey) {
+  const bodyEl = document.getElementById(`secbody-${trip.id}-${sectionKey}`);
+  if (!bodyEl) return;
+
+  bodyEl.innerHTML = `<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-text">Generating with AI…</div></div>`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey || '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: sectionKey === 'packing' ? 3000 : 1200,
+        messages: [
+          { role: 'user', content: sectionPrompt(trip, sectionKey) }
+        ],
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || `HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const content = data.content?.[0]?.text || '';
+
+    // Save to trip
+    const idx = trips.findIndex(t => t.id === trip.id);
+    if (idx !== -1) {
+      trips[idx].sections[sectionKey] = content;
+      if (sectionKey === 'packing') {
+        // Parse and store structured packing list
+        try {
+          const clean = content.replace(/```json[\s\S]*?```/g, m => m.slice(7,-3)).replace(/```/g,'').trim();
+          const parsed = JSON.parse(clean);
+          trips[idx].packItems = buildPackItems(parsed);
+        } catch(e) {
+          trips[idx].packItems = buildFallbackPackItems(trip);
+        }
+      }
+      save();
+      renderSectionContent(trips[idx], sectionKey);
+    }
+  } catch(err) {
+    console.error('AI error:', err);
+    renderSectionFallback(trip, sectionKey, err.message);
+  }
+}
+
+function buildPackItems(parsed) {
+  // Build flat item list keyed by uid from parsed AI categories
+  const result = {};
+  (parsed.categories || []).forEach(cat => {
+    (cat.items || []).forEach(item => {
+      const id = uid();
+      result[id] = { id, name: item.name || item, category: cat.name, catEmoji: cat.emoji || '📦', checked: false };
+    });
+  });
+  return result;
+}
+
+function buildFallbackPackItems(trip) {
+  const nights = daysBetween(trip.depart, trip.returnDate);
+  const items = [
+    { name: `T-shirts × ${Math.min(nights+1, 7)}`, category:'Clothing', catEmoji:'👔' },
+    { name: 'Underwear × 7', category:'Clothing', catEmoji:'👔' },
+    { name: 'Socks × 7', category:'Clothing', catEmoji:'👔' },
+    { name: 'Comfortable walking shoes', category:'Clothing', catEmoji:'👔' },
+    { name: 'Jeans / trousers', category:'Clothing', catEmoji:'👔' },
+    { name: 'Light jacket', category:'Clothing', catEmoji:'👔' },
+    { name: 'Passport', category:'Documents & Money', catEmoji:'📄' },
+    { name: 'Travel insurance documents', category:'Documents & Money', catEmoji:'📄' },
+    { name: 'Credit / debit card', category:'Documents & Money', catEmoji:'📄' },
+    { name: 'Local currency (cash)', category:'Documents & Money', catEmoji:'📄' },
+    { name: 'Phone + charger', category:'Electronics', catEmoji:'📱' },
+    { name: 'Power bank', category:'Electronics', catEmoji:'📱' },
+    { name: 'Universal travel adapter', category:'Electronics', catEmoji:'📱' },
+    { name: 'Earbuds / headphones', category:'Electronics', catEmoji:'📱' },
+    { name: 'Toothbrush & toothpaste', category:'Toiletries & Health', catEmoji:'🧴' },
+    { name: 'Shampoo & conditioner', category:'Toiletries & Health', catEmoji:'🧴' },
+    { name: 'Deodorant', category:'Toiletries & Health', catEmoji:'🧴' },
+    { name: 'Sunscreen SPF 50+', category:'Toiletries & Health', catEmoji:'🧴' },
+    { name: 'Basic first aid kit', category:'Toiletries & Health', catEmoji:'🧴' },
+    { name: 'Main travel backpack / suitcase', category:'Gear', catEmoji:'🎒' },
+    { name: 'Day pack', category:'Gear', catEmoji:'🎒' },
+    { name: 'Packing cubes', category:'Gear', catEmoji:'🎒' },
+  ];
+  const result = {};
+  items.forEach(it => { const id = uid(); result[id] = { id, ...it, checked: false }; });
+  return result;
+}
+
+function renderSectionContent(trip, sectionKey) {
+  const bodyEl = document.getElementById(`secbody-${trip.id}-${sectionKey}`);
+  if (!bodyEl) return;
+
+  if (sectionKey === 'packing') {
+    renderPackingList(trip, bodyEl);
+  } else {
+    const content = trip.sections[sectionKey] || '';
+    bodyEl.innerHTML = `<div class="guide-prose fade-in-up">${markdownToHtml(content)}</div>
+      <div style="margin-top:14px">
+        <button class="btn btn-secondary btn-sm" onclick="regenerateSection('${trip.id}','${sectionKey}')">🔄 Regenerate</button>
+      </div>`;
+  }
+}
+
+function renderSectionFallback(trip, sectionKey, errorMsg) {
+  const bodyEl = document.getElementById(`secbody-${trip.id}-${sectionKey}`);
+  if (!bodyEl) return;
+
+  if (sectionKey === 'packing') {
+    // Use fallback items
+    const idx = trips.findIndex(t => t.id === trip.id);
+    if (idx !== -1 && !trips[idx].packItems) {
+      trips[idx].packItems = buildFallbackPackItems(trip);
+      save();
+    }
+    renderPackingList(trips[idx] || trip, bodyEl);
+    return;
+  }
+
+  bodyEl.innerHTML = `<div class="section-error">
+    <p>⚠️ ${escapeHtml(errorMsg)}</p>
+    <button class="btn btn-secondary btn-sm" onclick="regenerateSection('${trip.id}','${sectionKey}')">Retry</button>
+  </div>`;
+}
+
+function regenerateSection(tripId, sectionKey) {
+  const trip = trips.find(t => t.id === tripId);
+  if (!trip) return;
+  // Clear cached content
+  const idx = trips.findIndex(t => t.id === tripId);
+  delete trips[idx].sections[sectionKey];
+  if (sectionKey === 'packing') delete trips[idx].packItems;
+  save();
+  generateSection(trips[idx], sectionKey);
+}
+
+// ── PACKING LIST RENDER ──────────────────────────────────────────
+function renderPackingList(trip, bodyEl) {
+  const items = trip.packItems || {};
+  const ids   = Object.keys(items);
+
+  if (ids.length === 0) {
+    bodyEl.innerHTML = '<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-text">Building packing list…</div></div>';
+    return;
+  }
+
+  // Group by category
+  const cats = {};
+  ids.forEach(id => {
+    const item = items[id];
+    const key  = item.category || 'Other';
+    if (!cats[key]) cats[key] = { emoji: item.catEmoji || '📦', items: [] };
+    cats[key].items.push(item);
+  });
+
+  let html = `<div class="fade-in-up">`;
+  Object.entries(cats).forEach(([catName, cat]) => {
+    html += `<div class="pack-category">
+      <div class="pack-category-title">${cat.emoji} ${escapeHtml(catName)}</div>`;
+    cat.items.forEach(item => {
+      const checked = trip.packState?.[item.id] || false;
+      html += `<div class="pack-item" id="pi-${item.id}">
+        <div class="pack-check ${checked?'checked':''}" onclick="togglePackItem('${trip.id}','${item.id}',this)"></div>
+        <div class="pack-item-name ${checked?'checked':''}" 
+          contenteditable="true" 
+          onfocus="this.setAttribute('data-orig',this.textContent)"
+          onblur="renamePackItem('${trip.id}','${item.id}',this)"
+          id="piname-${item.id}"
+        >${escapeHtml(item.name)}</div>
+        <div class="pack-item-delete" onclick="deletePackItem('${trip.id}','${item.id}')">×</div>
+      </div>`;
+    });
+    // Add item row per category
+    const safeId = catId(trip.id, catName);
+    const safeCat = catName.replace(/'/g, "\\'");
+    const safeEmoji = (cat.emoji||'📦').replace(/'/g, "\\'");
+    html += `<div class="add-item-row">
+      <input class="add-item-input" placeholder="Add item…" 
+        id="${safeId}"
+        onkeydown="if(event.key==='Enter'){addPackItem('${trip.id}','${safeCat}','${safeEmoji}',this);event.preventDefault()}"
+      >
+      <button class="btn btn-secondary btn-sm" 
+        onclick="addPackItem('${trip.id}','${safeCat}','${safeEmoji}',document.getElementById('${safeId}'))"
+      >+</button>
+    </div>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // Summary
+  const total   = ids.length;
+  const checked = ids.filter(id => trip.packState?.[id]).length;
+  html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div style="font-size:14px;color:var(--ink-mid)">${checked} / ${total} items packed</div>
+    <button class="btn btn-secondary btn-sm" onclick="regenerateSection('${trip.id}','packing')">🔄 Regenerate</button>
+  </div>
+  <div class="progress-wrap" style="margin-bottom:16px"><div class="progress-bar" style="width:${total?Math.round(checked/total*100):0}%"></div></div>` + html;
+
+  bodyEl.innerHTML = html;
+}
+
+function togglePackItem(tripId, itemId, el) {
+  const idx = trips.findIndex(t => t.id === tripId);
+  if (idx === -1) return;
+  if (!trips[idx].packState) trips[idx].packState = {};
+  trips[idx].packState[itemId] = !trips[idx].packState[itemId];
+  save();
+  el.classList.toggle('checked');
+  el.classList.add('check-pop');
+  setTimeout(() => el.classList.remove('check-pop'), 300);
+  const nameEl = document.getElementById(`piname-${itemId}`);
+  if (nameEl) nameEl.classList.toggle('checked', trips[idx].packState[itemId]);
+  // Update progress in packing section
+  const trip = trips[idx];
+  const items = trip.packItems || {};
+  const ids   = Object.keys(items);
+  const total = ids.length;
+  const chk   = ids.filter(id => trip.packState?.[id]).length;
+  const bodyEl = document.getElementById(`secbody-${tripId}-packing`);
+  if (bodyEl) {
+    const bar = bodyEl.querySelector('.progress-bar');
+    if (bar) bar.style.width = `${total ? Math.round(chk/total*100) : 0}%`;
+    const summary = bodyEl.querySelector('[data-summary]');
+    if (summary) summary.textContent = `${chk} / ${total} items packed`;
+  }
+  // Sync timeline
+  syncTimelineItem(tripId, 'pack_' + itemId, trips[idx].packState[itemId]);
+}
+
+function renamePackItem(tripId, itemId, el) {
+  const idx = trips.findIndex(t => t.id === tripId);
+  if (idx === -1) return;
+  const newName = el.textContent.trim();
+  if (!newName) { el.textContent = el.getAttribute('data-orig') || 'Item'; return; }
+  if (trips[idx].packItems?.[itemId]) {
+    trips[idx].packItems[itemId].name = newName;
+    save();
+  }
+}
+
+function deletePackItem(tripId, itemId) {
+  const idx = trips.findIndex(t => t.id === tripId);
+  if (idx === -1) return;
+  delete trips[idx].packItems[itemId];
+  delete trips[idx].packState[itemId];
+  save();
+  const el = document.getElementById(`pi-${itemId}`);
+  if (el) { el.style.opacity='0'; el.style.transform='translateX(20px)'; el.style.transition='all 0.2s'; setTimeout(() => el.remove(), 200); }
+}
+
+function catId(tripId, catName) {
+  return 'add-' + tripId + '-' + catName.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+function addPackItem(tripId, category, emoji, inputEl) {
+  const name = inputEl.value.trim();
+  if (!name) return;
+  const idx = trips.findIndex(t => t.id === tripId);
+  if (idx === -1) return;
+  const id = uid();
+  trips[idx].packItems = trips[idx].packItems || {};
+  trips[idx].packItems[id] = { id, name, category, catEmoji: emoji, checked: false };
+  save();
+  inputEl.value = '';
+  // Re-render packing section
+  const bodyEl = document.getElementById(`secbody-${tripId}-packing`);
+  if (bodyEl) renderPackingList(trips[idx], bodyEl);
+}
+
+// ── MARKDOWN TO HTML (simple) ────────────────────────────────────
+function markdownToHtml(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^#### (.+)$/gm,'<h4>$1</h4>')
+    .replace(/^### (.+)$/gm,'<h4>$1</h4>')
+    .replace(/^## (.+)$/gm,'<h4>$1</h4>')
+    .replace(/^# (.+)$/gm,'<h4>$1</h4>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/^(?!<[hul]|<\/[hul])(.+)$/gm, m => m ? m : '')
+    .replace(/\n/g,'<br>')
+    .replace(/^(.)/,'<p>$1')
+    .replace(/(.)$/,'$1</p>');
+}
+
+// ── TIMELINE ──────────────────────────────────────────────────────
+function renderTimelineTab() {
+  const active = trips.filter(t => t.status === 'active');
+  const sel    = document.getElementById('tl-trip-select');
+  sel.innerHTML = active.length === 0
+    ? '<option>No active trips</option>'
+    : active.map(t => `<option value="${t.id}">${t.destination} · ${formatDate(t.depart)}</option>`).join('');
+
+  if (active.length === 0) {
+    document.getElementById('tl-progress-wrap').style.display = 'none';
+    document.getElementById('tl-content').innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📅</div>
+      <h3>No active trips</h3>
+      <p>Create a trip to see your preparation timeline.</p>
+    </div>`;
+    return;
+  }
+  renderTimeline();
+}
+
+function renderTimeline() {
+  const sel = document.getElementById('tl-trip-select');
+  const tripId = sel.value;
+  const trip = trips.find(t => t.id === tripId);
+  if (!trip) return;
+
+  const departDate = trip.depart;
+  const dUntil     = daysUntil(departDate);
+
+  // Build all timeline tasks
+  const groups = buildTimelineGroups(trip, dUntil);
+
+  // Count progress
+  let total = 0, done = 0;
+  groups.forEach(g => g.items.forEach(i => {
+    total++;
+    if (trip.tlState?.[i.key]) done++;
+  }));
+
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('tl-progress-wrap').style.display = 'block';
+  document.getElementById('tl-pct').textContent = pct + '%';
+  document.getElementById('tl-bar').style.width = pct + '%';
+
+  // Render
+  let html = '';
+  if (pct === 100) {
+    html += `<div class="completion-banner fade-in-up">
+      <h2>🎒✈️ You're 100% Trip Ready!</h2>
+      <p>Have an incredible adventure in ${escapeHtml(trip.destination)}!</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" style="color:white;border-color:rgba(255,255,255,0.4);flex:1" onclick="archiveTrip('${trip.id}')">📦 Archive Trip</button>
+        <button class="btn btn-ghost btn-sm" style="color:white;border-color:rgba(255,255,255,0.4);flex:1" onclick="deleteTrip('${trip.id}')">🗑 Delete</button>
+      </div>
+    </div>`;
+  }
+
+  groups.forEach(g => {
+    const relevantItems = g.items.filter(i => {
+      // only show tasks due now or in the past bucket
+      if (g.threshold === Infinity) return true; // always show future bucket
+      return dUntil <= g.threshold || g.alwaysShow;
+    });
+    // Always show all groups but grey future ones
+    html += `<div class="tl-group">
+      <div class="tl-group-title">${g.label}</div>`;
+    g.items.forEach(item => {
+      const checked = trip.tlState?.[item.key] || false;
+      const isFuture = dUntil > (g.threshold || Infinity);
+      html += `<div class="tl-item" style="${isFuture?'opacity:0.45':''}">
+        <div class="tl-check ${checked?'checked':''}" onclick="toggleTlItem('${trip.id}','${item.key}',this)"></div>
+        <div class="tl-item-content">
+          <div class="tl-item-label ${checked?'checked':''}" id="tl-lbl-${trip.id}-${item.key}">${item.label}</div>
+          ${item.sub ? `<div class="tl-item-sub">${item.sub}</div>` : ''}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  document.getElementById('tl-content').innerHTML = html || '<p style="color:var(--ink-soft);padding:20px 0;text-align:center">No tasks yet.</p>';
+}
+
+function buildTimelineGroups(trip, dUntil) {
+  const packItems = Object.values(trip.packItems || {});
+  return [
+    {
+      label: `📅 6+ Weeks Before · ${formatDate(trip.depart)}`,
+      threshold: 999,
+      alwaysShow: true,
+      items: [
+        { key: 'visa_apply',   label: '📋 Apply for visa / check visa requirements', sub: 'Check your passport validity too' },
+        { key: 'vaccination',  label: '💉 Book travel vaccinations appointment', sub: 'Some vaccines need 4-6 weeks to work' },
+        { key: 'insurance',    label: '🛡 Purchase comprehensive travel insurance' },
+        { key: 'passport_chk', label: '📔 Verify passport validity (6+ months)', sub: `Expires: ${profile?.passportExp ? formatDate(profile.passportExp) : 'Check your passport'}` },
+        { key: 'flights_book', label: '✈️ Book flights' },
+      ],
+    },
+    {
+      label: '🗓 2–4 Weeks Before',
+      threshold: 28,
+      alwaysShow: true,
+      items: [
+        { key: 'accom_book',   label: '🏨 Confirm / book accommodation' },
+        { key: 'gear_buy',     label: '🛍 Purchase any gear or clothing needed' },
+        { key: 'house_sitter', label: '🏠 Arrange house / pet sitting if needed' },
+        { key: 'itinerary',    label: '🗺 Plan rough daily itinerary' },
+        { key: 'activities_book', label: '🎟 Book key activities / tours in advance' },
+        { key: 'sim_research', label: '📱 Research local SIM card options' },
+      ],
+    },
+    {
+      label: '📆 1 Week Before',
+      threshold: 7,
+      alwaysShow: true,
+      items: [
+        { key: 'bookings_confirm', label: '✅ Confirm all bookings (flights, hotel, tours)' },
+        { key: 'bank_notify',  label: '🏦 Notify bank of travel dates' },
+        { key: 'weather_chk',  label: '🌤 Check destination weather forecast' },
+        { key: 'offline_maps', label: '🗺 Download offline maps (Google Maps / Maps.me)' },
+        { key: 'emergency_contacts', label: '📞 Share itinerary with emergency contact' },
+        { key: 'currency_get', label: '💵 Get local currency' },
+      ],
+    },
+    {
+      label: '🌅 1–2 Days Before',
+      threshold: 2,
+      alwaysShow: true,
+      items: [
+        { key: 'charge_devices', label: '🔋 Charge all devices & power banks' },
+        { key: 'print_docs',   label: '🖨 Print important documents & bookings' },
+        { key: 'weigh_luggage', label: '⚖️ Weigh luggage (check airline limits)' },
+        { key: 'checkin_online', label: '📲 Check in online for flight' },
+        ...packItems.map(item => ({
+          key: 'pack_' + item.id,
+          label: `🎒 Pack: ${item.name}`,
+          sub: item.category,
+        })),
+      ],
+    },
+    {
+      label: '🛫 Day of Departure',
+      threshold: 0,
+      alwaysShow: true,
+      items: [
+        { key: 'passport_go',  label: '📔 Passport ✓' },
+        { key: 'phone_go',     label: '📱 Phone & charger ✓' },
+        { key: 'wallet_go',    label: '💳 Wallet & cards ✓' },
+        { key: 'keys_go',      label: '🔑 House keys ✓ (or given to key holder)' },
+        { key: 'tickets_go',   label: '🎫 Flight tickets / boarding pass ✓' },
+        { key: 'insurance_go', label: '🛡 Travel insurance ✓' },
+        { key: 'arrive_airport', label: '⏰ Leave for airport on time' },
+      ],
+    },
+  ];
+}
+
+function toggleTlItem(tripId, key, el) {
+  const idx = trips.findIndex(t => t.id === tripId);
+  if (idx === -1) return;
+  if (!trips[idx].tlState) trips[idx].tlState = {};
+  trips[idx].tlState[key] = !trips[idx].tlState[key];
+  // Sync pack state if this is a packing item
+  if (key.startsWith('pack_')) {
+    const itemId = key.replace('pack_','');
+    trips[idx].packState = trips[idx].packState || {};
+    trips[idx].packState[itemId] = trips[idx].tlState[key];
+  }
+  save();
+  el.classList.toggle('checked');
+  el.classList.add('check-pop');
+  setTimeout(() => el.classList.remove('check-pop'), 300);
+  const lblEl = document.getElementById(`tl-lbl-${tripId}-${key}`);
+  if (lblEl) lblEl.classList.toggle('checked', trips[idx].tlState[key]);
+  // Recount progress
+  const trip = trips[idx];
+  const groups = buildTimelineGroups(trip, daysUntil(trip.depart));
+  let total = 0, done = 0;
+  groups.forEach(g => g.items.forEach(i => {
+    total++;
+    if (trip.tlState?.[i.key]) done++;
+  }));
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('tl-pct').textContent = pct + '%';
+  document.getElementById('tl-bar').style.width = pct + '%';
+  if (pct === 100) {
+    setTimeout(() => renderTimeline(), 400);
+  }
+}
+
+function syncTimelineItem(tripId, key, checked) {
+  const idx = trips.findIndex(t => t.id === tripId);
+  if (idx === -1) return;
+  trips[idx].tlState = trips[idx].tlState || {};
+  trips[idx].tlState[key] = checked;
+  save();
+}
+
+// ── PROFILE ───────────────────────────────────────────────────────
+function renderProfile() {
+  if (!profile) return;
+  const el = document.getElementById('profile-display');
+  el.innerHTML = `<div class="card">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+      <div class="profile-avatar">${(profile.name||'?')[0].toUpperCase()}</div>
+      <div>
+        <div class="profile-name">${escapeHtml(profile.name || 'Traveller')}</div>
+        <div class="profile-meta">${escapeHtml(profile.city || '')}${profile.city && profile.country ? ', ' : ''}${escapeHtml(profile.country || '')}</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      ${profileRow('🛂 Passport', profile.passport)}
+      ${profileRow('📅 Passport Exp', profile.passportExp ? formatDate(profile.passportExp) : '—')}
+      ${profileRow('📐 Height', profile.height ? profile.height + ' cm' : '—')}
+      ${profileRow('⚖️ Weight', profile.weight ? profile.weight + ' kg' : '—')}
+      ${profileRow('🗺 Experience', profile.experience || '—')}
+      ${profileRow('🎂 Age', profile.age || '—')}
+    </div>
+  </div>`;
+
+  const apiInput = document.getElementById('api-key-input');
+  if (apiInput) apiInput.value = apiKey || '';
+}
+
+function profileRow(label, value) {
+  return `<div><div style="font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px">${label}</div>
+  <div style="font-size:14px;font-weight:600;color:var(--ink);margin-top:3px">${escapeHtml(value||'—')}</div></div>`;
+}
+
+function saveApiKey(val) {
+  apiKey = val.trim();
+  localStorage.setItem('pr_apikey', apiKey);
+}
+
+function showEditProfile() {
+  if (!profile) return;
+  const content = `
+    <div class="sheet-title">Edit Profile</div>
+    <div class="field"><label>Full Name</label><input type="text" id="ep-name" value="${escapeHtml(profile.name||'')}"></div>
+    <div class="field-row">
+      <div class="field"><label>Age</label><input type="number" id="ep-age" value="${escapeHtml(profile.age||'')}"></div>
+      <div class="field"><label>Gender</label>
+        <select id="ep-gender">
+          <option ${profile.gender===''?'selected':''}>–</option>
+          <option ${profile.gender==='Male'?'selected':''}>Male</option>
+          <option ${profile.gender==='Female'?'selected':''}>Female</option>
+          <option ${profile.gender==='Non-binary'?'selected':''}>Non-binary</option>
+          <option ${profile.gender==='Prefer not to say'?'selected':''}>Prefer not to say</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Home Country</label><input type="text" id="ep-country" value="${escapeHtml(profile.country||'')}"></div>
+    <div class="field"><label>Home City</label><input type="text" id="ep-city" value="${escapeHtml(profile.city||'')}"></div>
+    <div class="field"><label>Passport Nationality</label><input type="text" id="ep-passport" value="${escapeHtml(profile.passport||'')}"></div>
+    <div class="field"><label>Passport Expiry</label><input type="date" id="ep-passportExp" value="${profile.passportExp||''}"></div>
+    <div class="field-row">
+      <div class="field"><label>Height (cm)</label><input type="number" id="ep-height" value="${escapeHtml(profile.height||'')}"></div>
+      <div class="field"><label>Weight (kg)</label><input type="number" id="ep-weight" value="${escapeHtml(profile.weight||'')}"></div>
+    </div>
+    <div class="field"><label>Experience</label>
+      <select id="ep-exp">
+        <option ${profile.experience==='Beginner'?'selected':''} value="Beginner">🌱 Beginner</option>
+        <option ${profile.experience==='Intermediate'?'selected':''} value="Intermediate">🧭 Intermediate</option>
+        <option ${profile.experience==='Experienced'?'selected':''} value="Experienced">🗺 Experienced</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveEditProfile()">Save Profile</button>
+  `;
+  openSheet(content);
+}
+
+function saveEditProfile() {
+  profile.name        = document.getElementById('ep-name')?.value.trim() || profile.name;
+  profile.age         = document.getElementById('ep-age')?.value || profile.age;
+  profile.gender      = document.getElementById('ep-gender')?.value || profile.gender;
+  profile.country     = document.getElementById('ep-country')?.value.trim() || profile.country;
+  profile.city        = document.getElementById('ep-city')?.value.trim() || profile.city;
+  profile.passport    = document.getElementById('ep-passport')?.value.trim() || profile.passport;
+  profile.passportExp = document.getElementById('ep-passportExp')?.value || profile.passportExp;
+  profile.height      = document.getElementById('ep-height')?.value || profile.height;
+  profile.weight      = document.getElementById('ep-weight')?.value || profile.weight;
+  profile.experience  = document.getElementById('ep-exp')?.value || profile.experience;
+  save();
+  closeSheet();
+  renderProfile();
+  renderHome();
+  toast('Profile updated ✓');
+}
+
+// ── SHEET ─────────────────────────────────────────────────────────
+function openSheet(content) {
+  document.getElementById('sheet-content').innerHTML = content;
+  document.getElementById('sheet').classList.add('visible');
+  document.getElementById('sheet-overlay').classList.add('visible');
+}
+
+function closeSheet() {
+  document.getElementById('sheet').classList.remove('visible');
+  document.getElementById('sheet-overlay').classList.remove('visible');
+}
+
+// ── TRIP MANAGEMENT ───────────────────────────────────────────────
+function tripProgress(trip) {
+  const groups = buildTimelineGroups(trip, daysUntil(trip.depart || new Date().toISOString().slice(0,10)));
+  let total = 0, done = 0;
+  groups.forEach(g => g.items.forEach(i => {
+    total++;
+    if (trip.tlState?.[i.key]) done++;
+  }));
+  return total ? Math.round(done/total*100) : 0;
+}
+
+function archiveTrip(tripId) {
+  const idx = trips.findIndex(t => t.id === tripId);
+  if (idx === -1) return;
+  trips[idx].status = 'archived';
+  save();
+  closeSheet();
+  renderTimeline();
+  renderTrips();
+  renderHome();
+  toast('Trip archived 📦');
+}
+
+function deleteTrip(tripId) {
+  if (!confirm('Delete this trip? This cannot be undone.')) return;
+  trips = trips.filter(t => t.id !== tripId);
+  save();
+  renderTimeline();
+  renderTrips();
+  renderHome();
+  toast('Trip deleted 🗑');
+}
+
+function confirmResetApp() {
+  if (!confirm('Reset all app data? This will delete your profile and all trips.')) return;
+  localStorage.clear();
+  location.reload();
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────
+boot();
+</script>
+</body>
+</html>
